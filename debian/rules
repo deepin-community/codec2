@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --builddirectory=Build --buildsystem=cmake
+
+override_dh_auto_configure:
+	dh_auto_configure --builddirectory=Build -- \
+	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	-DINSTALL_EXAMPLES=TRUE \
+	-DUNITTEST=TRUE
+
+override_dh_auto_build:
+	dh_auto_build --builddirectory=Build
+	dh_auto_configure --builddirectory=Build/lpcnet-build --sourcedirectory=lpcnet -- \
+	-DCMAKE_VERBOSE_MAKEFILE=ON -DDISABLE_CPU_OPTIMIZATION=ON -DCODEC2_BUILD_DIR=$(CURDIR)/Build
+	cd Build/lpcnet-build && cmake --build .
+	cd Build && cmake -DLPCNET_BUILD_DIR=lpcnet-build ..
+	cd Build && cmake --build .
+
+override_dh_auto_test:
+	- override_dh_auto_test
+
+override_dh_acc:
+	- dh_acc $@

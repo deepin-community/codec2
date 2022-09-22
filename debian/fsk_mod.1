@@ -1,0 +1,57 @@
+.TH FSK_MOD 1 2020-12-04 fsk_mod "User commands"
+.SH NAME
+fsk_mod \- a diagnostic tool for the codec2 library to create a raw horus modem
+signal file from a codec2 bit file.
+.SH SYNOPSIS
+.B fsk_mod usage:
+.IR Mode
+.IR SampleFreq
+.IR SymbolFreq
+.IR TxFreq1
+.IR TxFreqSpace
+.IR InputOneBitPerCharFile
+.IR OutputModRawFile
+.PP
+.SH DESCRIPTION
+.PP
+Reads in a set of bits to modulate
+from a file, passed as a parameter, and writes modulated output to
+another file
+.PP
+.SH OPTIONS
+The first argument, 
+.IR Mode
+is an integer. 2 for 2FSK modem, 4 for 4FSK modem.
+.PP
+The second argument, 
+.IR SampleFreq
+is an integer specifying the sample rate.
+.PP
+The third argument, 
+.IR SymbolFreq
+is an integer.
+.PP
+The fourth argument, 
+.IR TxFreq1
+is an integer.
+.PP
+The fifth argument, 
+.IR TxFreqSpace
+is an integer.
+.PP
+The sixth argument,
+.IR InputOneBitPerCharFile
+is the file name of a file with codec2 encoded bits. If "-" is
+given the input is taken from stdin.
+.PP
+The seventh argument, 
+.IR OutputModRawFile
+is the file name of a file to be created with modem sample data. If "-" is
+given the output is sent to stdout.
+.PP
+.SH "SEE ALSO"
+.BR fm_demod (1),
+.BR fdmdv_mod (1),
+.BR fdmdv_demod (1),
+.BR fdmdv_get_test_bits (1)
+.BR fdmdv_put_test_bits (1)

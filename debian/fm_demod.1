@@ -1,0 +1,30 @@
+.TH FM_DEMOD 1 2015-02-24 fm_demod "User commands"
+.SH NAME
+fm_demod \- a diagnostic tool for the codec2 library to create an audio file from signal samples.
+.SH SYNOPSIS
+.B fm_demod usage:
+.IR InputFMRawFile
+.IR OutputSpeechRawFile
+.PP
+.SH DESCRIPTION
+.PP
+Given an input raw file (44.4 kHz, 16 bit shorts) with a FM signal centered
+11.1 kHz, outputs a file of demodulated audio samples.
+.PP
+.SH OPTIONS
+The first argument, 
+.IR InputFMRawFile
+is the file name of a file with FM signal samples. If "-" is
+given the input is taken from stdin.
+.PP
+The second argument, 
+.IR OutputSpeechRawFile
+is the file name of a file to be created with audio data. If "-" is
+given the output is sent to stdout.
+.PP
+.SH "SEE ALSO"
+.BR fsk_mod (1),
+.BR fdmdv_mod (1),
+.BR fdmdv_demod (1),
+.BR fdmdv_get_test_bits (1)
+.BR fdmdv_put_test_bits (1)

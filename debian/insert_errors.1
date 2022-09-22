@@ -1,0 +1,34 @@
+.TH INSERT_ERRORS "1" "Feb 2013" "INSERT_ERRORS" "User Commands"
+.SH NAME
+insert_errors \- codec2 testing framework
+.SH SYNOPSIS
+.B insert_errors usage:
+.IR InputBitFile
+.IR OutputBitFile
+.IR ErrorFile
+.PP
+.SH DESCRIPTION
+Codec2 test and evaluation program. Inserts errors into a Codec 2 bit
+stream using error files.  All files are in one bit per char format.
+.SH OPTIONS
+The first argument, 
+.IR InputBitFile
+is the file name of a file with codec2 encoded bits. If "-" is
+given the input is taken from stdin.
+.PP
+The second argument,
+.IR OutputBitFile
+is the file name of a file to be created with speech data. If "-" is
+given the output is sent to stdout.
+.PP
+The third argument,
+.IR ErrorFile
+is an existing file with error bits.
+.PP
+.SH "SEE ALSO"
+.BR c2dec (1),
+.BR c2enc (1),
+.BR fdmdv_demod (1),
+.BR fdmdv_mod (1),
+.BR fdmdv_get_test_bits (1),
+.BR fdmdv_put_test_bits (1),

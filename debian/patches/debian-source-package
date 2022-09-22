@@ -1,0 +1,89 @@
+Description: The Debian source contains the lpcnet tar source,
+ So this patch uses that feature and avoids fetching content.
+Author: A. Maitland Bottoms <bottoms@debian.org>
+
+--- a/lpcnet/CMakeLists.txt
++++ b/lpcnet/CMakeLists.txt
+@@ -48,7 +48,7 @@
+ message(STATUS "LPCNet version: ${LPCNET_VERSION}")
+ 
+ # Set default flags
+-set(CMAKE_C_FLAGS "-Wall -W -Wextra -Wno-unused-function -O3 -g -I. -MD ${CMAKE_C_FLAGS} -DENABLE_ASSERTIONS")
++set(CMAKE_C_FLAGS "-Wall -W -Wextra -Wno-unused-function -fPIC -O3 -g -I. -MD ${CMAKE_C_FLAGS} -DENABLE_ASSERTIONS")
+ 
+ # Detection of available CPU optimizations
+ if(NOT DISABLE_CPU_OPTIMIZATION)
+@@ -91,35 +91,11 @@
+     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfpu=neon -march=armv8-a -mtune=cortex-a53")
+ endif()
+ 
+-# grab latest NN model (or substitute your own)
+-set(LPCNET_ROOT http://rowetel.com/downloads/deep/)
+-set(LPCNET_FILE lpcnet_191005_v1.0.tgz)
+-set(LPCNET_URL ${LPCNET_ROOT}${LPCNET_FILE})
+-
+-# Work around not having the FetchContent module.
+-if(CMAKE_VERSION VERSION_LESS 3.11.4)
+-    set(lpcnet_SOURCE_DIR ${CMAKE_BINARY_DIR}/src)
+-    if(NOT EXISTS ${lpcnet_SOURCE_DIR})
+-        file(DOWNLOAD ${LPCNET_URL}
+-            ${CMAKE_BINARY_DIR}/${LPCNET_FILE}
+-            SHOW_PROGRESS
+-        )
+-        file(MAKE_DIRECTORY ${lpcnet_SOURCE_DIR})
+-        execute_process(COMMAND tar -xzf ${CMAKE_BINARY_DIR}/${LPCNET_FILE} -C ${CMAKE_BINARY_DIR}/src)
+-    endif()
+-else()
+-    include(FetchContent)
+-    FetchContent_Declare(
+-        lpcnet
+-        URL ${LPCNET_URL})
+-    FetchContent_GetProperties(lpcnet)
+-    if(NOT lpcnet_POPULATED)
+-        FetchContent_Populate(lpcnet)
+-    endif()
+-endif()
++set(lpcnet_SOURCE_DIR ${CMAKE_SOURCE_DIR}/../lpcnet191005)
+ 
+ # Find codec2
+ if(CODEC2_BUILD_DIR)
++    set(CMAKE_PREFIX_PATH=../${CMAKE_PREFIX_PATH})
+     find_package(codec2 REQUIRED
+         PATHS ${CODEC2_BUILD_DIR}
+         NO_DEFAULT_PATH
+--- a/lpcnet/src/CMakeLists.txt
++++ b/lpcnet/src/CMakeLists.txt
+@@ -19,7 +19,7 @@
+     ${lpcnet_SOURCE_DIR}/nnet_data.c
+ )
+ 
+-add_library(lpcnetfreedv SHARED ${lpcnet_freedv_srcs})
++add_library(lpcnetfreedv STATIC ${lpcnet_freedv_srcs})
+ target_link_libraries(lpcnetfreedv codec2)
+ set_target_properties(lpcnetfreedv PROPERTIES
+     PUBLIC_HEADER lpcnet_freedv.h
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -248,6 +248,9 @@
+     horus_api.h
+     ${CODEC2_VERSION_PATH}/version.h
+ )
++if(LPCNET)
++  list(APPEND CODEC2_PUBLIC_HEADERS ${CMAKE_SOURCE_DIR}/lpcnet/src/lpcnet_freedv.h)
++endif()
+ 
+ #
+ # Debug options
+@@ -259,10 +262,10 @@
+ #
+ add_library(codec2 ${CODEC2_SRCS})
+ if(UNIX)
+-    target_link_libraries(codec2 m)
++    target_link_libraries(codec2 PUBLIC m)
+ endif(UNIX)
+ if(LPCNET AND lpcnetfreedv_FOUND)
+-    target_link_libraries(codec2 lpcnetfreedv)
++    target_link_libraries(codec2 PRIVATE lpcnetfreedv)
+ endif()
+ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+ set_target_properties(codec2 PROPERTIES

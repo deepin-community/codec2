@@ -1,0 +1,51 @@
+.TH FDMDV_DEMOD 1 2020-12-04 fdmdv_demod "User commands"
+.SH NAME
+fdmdv_demod \- a diagnostic tool for the codec2 library to create a codec2
+bit file from a series of FDMDV modem samples.
+.SH SYNOPSIS
+.B fdmdv_demod usage:
+.IR InputModemRawFile
+.IR OutputBitFile
+.IR [Nc]
+.IR [OctaveDumpFile]
+.PP
+.SH DESCRIPTION
+.PP
+Given an input raw file (8kHz, 16 bit shorts) of FDMDV modem samples
+outputs a file of bits.  The output file is assumed to be arranged
+as codec frames of 56 bits (7 bytes) which are received as two 28
+bit modem frames.
+.PP
+Demod states can be optionally logged to an Octave file for display
+using the Octave script fdmdv_demod_c.m.  This is useful for
+checking demod performance.
+.PP
+.SH EXAMPLE
+ fdmdv_dmod hts1a_fdmdv.raw hts1a.c2
+.PP
+.SH OPTIONS
+The first argument,
+.IR InputModemRawFile
+is the file name of a file with FDMDV modem samples. If "-" is
+given the input is taken from stdin.
+.PP
+The second argument, 
+.IR OutputBitFile
+is the file name of a file to be created with codec2 bits. If "-" is
+given the output is sent to stdout.
+.PP
+The optional third argument,
+.IR [Nc]
+is the number of carriers to use in the modem. The default is 14.
+The minimum is 2 and the maximum is 20.
+.PP
+The optional fourth argument,
+.IR [OctaveDumpFile]
+is the name of to Octave data file to create.
+.PP
+.SH "SEE ALSO"
+.BR c2dec (1),
+.BR c2enc (1),
+.BR fdmdv_mod (1),
+.BR fdmdv_get_test_bits (1)
+.BR fdmdv_put_test_bits (1)

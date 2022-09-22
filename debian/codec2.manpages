@@ -1,0 +1,11 @@
+debian/c2dec.1
+debian/c2enc.1
+debian/drs232.1
+debian/drs232_ldpc.1
+debian/fdmdv_demod.1
+debian/fdmdv_mod.1
+debian/fdmdv_get_test_bits.1
+debian/fdmdv_put_test_bits.1
+debian/fm_demod.1
+debian/fsk_mod.1
+debian/insert_errors.1

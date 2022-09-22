@@ -1,0 +1,4 @@
+usr/include/codec2/*
+usr/lib/*/libcodec2.so
+usr/lib/*/cmake
+usr/lib/*/pkgconfig

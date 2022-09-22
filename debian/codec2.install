@@ -1,0 +1,11 @@
+usr/bin/c2dec
+usr/bin/c2enc
+usr/bin/drs232
+usr/bin/drs232_ldpc
+usr/bin/fdmdv_demod
+usr/bin/fdmdv_get_test_bits
+usr/bin/fdmdv_mod
+usr/bin/fdmdv_put_test_bits
+usr/bin/fm_demod
+usr/bin/fsk_mod
+usr/bin/insert_errors

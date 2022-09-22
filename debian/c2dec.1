@@ -1,0 +1,34 @@
+.TH C2DEC "1" "Aug 2010" "C2DEC" "User Commands"
+.SH NAME
+c2dec \- codec2 testing framework
+.SH DESCRIPTION
+Codec2 test and evaluation program
+.SH USAGE
+c2dec 3200|2400|1600|1400}1300|1200 InputFile OutputRawFile [OPTIONS]
+.SH OPTIONS
+.TP
+\fB\-\-help\fR
+display help and exit
+.TP
+\fB\-\-ber\fR
+Set bit error rate (float)
+.TP
+\fB\-\-startbit\fR
+set start bit (integer)
+.TP
+\fB\-\-endbit\fR
+set stop bit (integer)
+.TP
+\fB\-\-berfile\fR
+specify berfile (file name string)
+.TP
+\fB\-\-natural\fR
+use natural binary code (default is gray code)
+.TP
+\fB\-\-dump\fR
+specify dump file (file name string)
+.PP
+Decodes a file of bits to a file of raw speech samples using codec2.
+.SH "SEE ALSO"
+.PP
+c2demo(1) c2enc(1) c2sim(1) fdmdv_demod(1) fdmdv_interleave(1) fdmdv_mod(1) fdmdv_put_test_bits(1) fec_dec(1) fec_enc(1) insert_errors(1)

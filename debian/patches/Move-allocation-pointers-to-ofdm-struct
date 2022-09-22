@@ -1,0 +1,162 @@
+From a0101b7ce1c5c4c6aa53f441e134a06b4a079aa4 Mon Sep 17 00:00:00 2001
+From: srsampson <coupaydeville@gmail.com>
+Date: Tue, 28 Apr 2020 19:06:34 -0500
+Subject: [PATCH] Move allocation pointers to ofdm struct
+
+---
+ src/interldpc.c     |  2 +-
+ src/ofdm.c          | 40 ++++++++++++++++++----------------------
+ src/ofdm_internal.h |  7 +++++--
+ 3 files changed, 24 insertions(+), 25 deletions(-)
+
+diff --git a/src/interldpc.c b/src/interldpc.c
+index 45402490..55b44510 100644
+--- a/src/interldpc.c
++++ b/src/interldpc.c
+@@ -287,7 +287,7 @@ void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float
+     gp_interleave_comp(coded_symbols_inter, coded_symbols, interleave_frames * coded_syms_per_frame);
+ 
+     for (j = 0; j < interleave_frames; j++) {
+-        ofdm_assemble_modem_frame_symbols(tx_symbols, &coded_symbols_inter[j * coded_syms_per_frame], &txt_bits[config->txtbits * j]);
++        ofdm_assemble_modem_frame_symbols(ofdm, tx_symbols, &coded_symbols_inter[j * coded_syms_per_frame], &txt_bits[config->txtbits * j]);
+         ofdm_txframe(ofdm, &tx_sams[j * Nsamperframe], tx_symbols);
+     }
+ }
+diff --git a/src/ofdm.c b/src/ofdm.c
+index 8b5c2b74..da6b5ac6 100644
+--- a/src/ofdm.c
++++ b/src/ofdm.c
+@@ -88,10 +88,6 @@ static const int8_t pilotvalues[] = {
+ 
+ static struct OFDM_CONFIG ofdm_config;
+ 
+-static complex float *tx_uw_syms;
+-static int *uw_ind;
+-static int *uw_ind_sym;
+-
+ static float ofdm_tx_centre; /* TX Center frequency */
+ static float ofdm_rx_centre; /* RX Center frequency */
+ static float ofdm_fs; /* Sample rate */
+@@ -355,11 +351,11 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
+      * need to pair the UW bits so they fit into symbols.  The LDPC decoder
+      * works on symbols so we can't break up any symbols into UW/LDPC bits.
+      */
+-    uw_ind = MALLOC(sizeof (int) * ofdm_nuwbits);
+-    assert(uw_ind != NULL);
++    ofdm->uw_ind = MALLOC(sizeof (int) * ofdm_nuwbits);
++    assert(ofdm->uw_ind != NULL);
+ 
+-    uw_ind_sym = MALLOC(sizeof (int) * (ofdm_nuwbits / 2));
+-    assert(uw_ind_sym != NULL);
++    ofdm->uw_ind_sym = MALLOC(sizeof (int) * (ofdm_nuwbits / 2));
++    assert(ofdm->uw_ind_sym != NULL);
+ 
+     /*
+      * The Unique Word is placed in different indexes based on
+@@ -367,17 +363,17 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
+      */
+     for (i = 0, j = 0; i < (ofdm_nuwbits / 2); i++, j += 2) {
+         int val = floorf((i + 1) * (ofdm_nc + 1) / 2);
+-        uw_ind_sym[i] = val;             // symbol index
++        ofdm->uw_ind_sym[i] = val;             // symbol index
+ 
+-        uw_ind[j    ] = (val * 2);       // bit index 1
+-        uw_ind[j + 1] = (val * 2) + 1;   // bit index 2
++        ofdm->uw_ind[j    ] = (val * 2);       // bit index 1
++        ofdm->uw_ind[j + 1] = (val * 2) + 1;   // bit index 2
+     }
+ 
+-    tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm_nuwbits / 2));
+-    assert(tx_uw_syms != NULL);
++    ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm_nuwbits / 2));
++    assert(ofdm->tx_uw_syms != NULL);
+ 
+     for (i = 0; i < (ofdm_nuwbits / 2); i++) {
+-        tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
++        ofdm->tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
+     }
+ 
+     /* sync state machine */
+@@ -478,9 +474,9 @@ void ofdm_destroy(struct OFDM *ofdm) {
+     FREE(ofdm->rx_amp);
+     FREE(ofdm->aphase_est_pilot_log);
+     FREE(ofdm->tx_uw);
+-    FREE(tx_uw_syms);
+-    FREE(uw_ind);
+-    FREE(uw_ind_sym);
++    FREE(ofdm->tx_uw_syms);
++    FREE(ofdm->uw_ind);
++    FREE(ofdm->uw_ind_sym);
+     FREE(ofdm);
+ }
+ 
+@@ -1722,7 +1718,7 @@ void ofdm_assemble_modem_frame(struct OFDM *ofdm, uint8_t modem_frame[],
+     int u = 0;
+ 
+     for (s = 0; s < (ofdm_bitsperframe - ofdm_ntxtbits); s++) {
+-        if ((u < ofdm_nuwbits) && (s == uw_ind[u])) {
++        if ((u < ofdm_nuwbits) && (s == ofdm->uw_ind[u])) {
+             modem_frame[s] = ofdm->tx_uw[u++];
+         } else {
+             modem_frame[s] = payload_bits[p++];
+@@ -1742,7 +1738,7 @@ void ofdm_assemble_modem_frame(struct OFDM *ofdm, uint8_t modem_frame[],
+ /*
+  * Assemble modem frame from UW, payload symbols, and txt bits
+  */
+-void ofdm_assemble_modem_frame_symbols(complex float modem_frame[],
++void ofdm_assemble_modem_frame_symbols(struct OFDM *ofdm, complex float modem_frame[],
+   COMP payload_syms[], uint8_t txt_bits[]) {
+     complex float *payload = (complex float *) &payload_syms[0]; // complex has same memory layout
+     int Nsymsperframe = ofdm_bitsperframe / ofdm_bps;
+@@ -1755,8 +1751,8 @@ void ofdm_assemble_modem_frame_symbols(complex float modem_frame[],
+     int u = 0;
+ 
+     for (s = 0; s < (Nsymsperframe - Ntxtsyms); s++) {
+-        if ((u < Nuwsyms) && (s == uw_ind_sym[u])) {
+-            modem_frame[s] = tx_uw_syms[u++];
++        if ((u < Nuwsyms) && (s == ofdm->uw_ind_sym[u])) {
++            modem_frame[s] = ofdm->tx_uw_syms[u++];
+         } else {
+             modem_frame[s] = payload[p++];
+         }
+@@ -1787,7 +1783,7 @@ void ofdm_disassemble_modem_frame(struct OFDM *ofdm, uint8_t rx_uw[],
+     int u = 0;
+ 
+     for (s = 0; s < (Nsymsperframe - Ntxtsyms); s++) {
+-        if ((u < Nuwsyms) && (s == uw_ind_sym[u])) {
++        if ((u < Nuwsyms) && (s == ofdm->uw_ind_sym[u])) {
+             qpsk_demod(ofdm->rx_np[s], dibit);
+ 
+             rx_uw[ofdm_bps * u    ] = dibit[1];
+diff --git a/src/ofdm_internal.h b/src/ofdm_internal.h
+index e8439d2c..9bc0086f 100644
+--- a/src/ofdm_internal.h
++++ b/src/ofdm_internal.h
+@@ -101,11 +101,14 @@ struct OFDM {
+     complex float *pilots;
+     complex float **rx_sym;
+     complex float *rx_np;
+-
++    complex float *tx_uw_syms;
++    
+     float *rx_amp;
+     float *aphase_est_pilot_log;
+ 
+     uint8_t *tx_uw;
++    int *uw_ind;
++    int *uw_ind_sym;
+ 
+     // State enums
+     State sync_state;
+@@ -162,7 +165,7 @@ complex float qpsk_mod(int *);
+ void qpsk_demod(complex float, int *);
+ void ofdm_txframe(struct OFDM *, complex float *, complex float []);
+ void ofdm_assemble_modem_frame(struct OFDM *, uint8_t [], uint8_t [], uint8_t []);
+-void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
++void ofdm_assemble_modem_frame_symbols(struct OFDM *, complex float [], COMP [], uint8_t []);
+ void ofdm_disassemble_modem_frame(struct OFDM *, uint8_t [], COMP [], float [], short []);
+ void ofdm_rand(uint16_t [], int);
+ void ofdm_generate_payload_data_bits(uint8_t [], int);
+-- 
+2.20.1
+

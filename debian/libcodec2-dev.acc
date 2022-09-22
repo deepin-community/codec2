@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<descriptor>
+
+<headers>
+debian/libcodec2-dev/usr/include/codec2/
+</headers>
+
+<libs>
+./debian/libcodec2-0.8.1/usr/lib/
+</libs>
+
+</descriptor>

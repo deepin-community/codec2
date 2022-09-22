@@ -1,0 +1,40 @@
+.TH FDMDV_MOD 1 2020-12-04 fdmdv_mod "User commands"
+.SH NAME
+fdmdv_mod \- a diagnostic tool for the codec2 library to create a raw modem
+signal file from a codec2 bit file.
+.SH SYNOPSIS
+.B fdmdv_mod usage:
+.IR InputBitFile
+.IR OutputModemRawFile
+.IR [Nc]
+.PP
+.SH DESCRIPTION
+.PP
+Given an input file of bits outputs a raw file (8kHz, 16 bit shorts)
+of FDMDV modem samples ready to send over a HF radio channel.  The
+input file is assumed to be arranged as codec frames of 56 bits (7
+bytes) which we send as two 28 bit modem frames.
+.PP
+.SH EXAMPLE
+ fdmdv_mod hts1a.c2 hts1a_fdmdv.raw
+.PP
+.SH OPTIONS
+The first argument, 
+.IR InputBitFile
+is the file name of a file with codec2 encoded bits. If "-" is
+given the input is taken from stdin.
+.PP
+The second argument, 
+.IR OutputModemRawFile
+is the file name of a file to be created with modem sample data. If "-" is
+given the output is sent to stdout.
+.PP
+The optional third argument,
+.IR [Nc]
+is the number of carriers to use in the modem. The default is 14.
+The minimum is 2 and the maximum is 20.
+.PP
+.SH "SEE ALSO"
+.BR fdmdv_demod (1),
+.BR fdmdv_get_test_bits (1)
+.BR fdmdv_put_test_bits (1)

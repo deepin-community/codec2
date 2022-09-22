@@ -1,0 +1,46 @@
+.TH DRS232_LDPC 1 2020-12-04 drs232_ldpc "User commands"
+.SH NAME
+drs232_ldpc \- Horus SSTV reception using the codec2 library.
+.SH SYNOPSIS
+.B drs232_ldpc usage:
+.IR InputOneBitPerChar
+.IR OutputPacket
+.IR [-v[v]]
+.PP
+.SH DESCRIPTION
+.PP
+Looks for a unique word in series of soft decision symbols.  When
+found, deframes a RS232 encoded frame of soft decision bit, LDPC
+decodes, and outputs a frame of packed bytes.  Used for high bit
+rate Horus SSTV reception.
+.PP
+  Frame format:
+.PP
+    16 bytes 0x55 - 0xabcdef01 UW - 256 bytes of payload - 2 bytes CRC - 65 bytes LPDC Parity
+.PP
+  Each byte is encoded as a 10 bit RS232 serial word: 
+.PP
+    0 LSB .... MSB 1
+.PP
+.SH OPTIONS
+The first argument, 
+.IR InputOneSymbolPerFloat
+is the file name of a file with Horus encoded bits. If "-" is
+given the input is taken from stdin.
+.PP
+The second argument, 
+.IR OutputPackets
+is the file name of a file to be created with modem sample data. If "-" is
+given the output is sent to stdout.
+.PP
+The optional third argument,
+.IR [-v]
+.IR [-vv]
+set the verbosity of the output.
+.PP
+.SH "SEE ALSO"
+.BR drs232 (1),
+.BR fdmdv_mod (1),
+.BR fdmdv_demod (1),
+.BR fdmdv_get_test_bits (1),
+.BR fdmdv_put_test_bits (1)

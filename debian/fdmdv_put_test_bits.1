@@ -1,0 +1,31 @@
+.TH FDMDV_PUT_TEST_BITS 1 2020-12-04 fdmdv_put_test_bits "User commands"
+.SH NAME
+fdmdv_put_test_bits \- a diagnostic tool for the codec2 library to test fdmdv_mod.
+.SH SYNOPSIS
+.B fdmdv_put_test_bits usage:
+.IR InputBitFile
+.IR [Nc]
+.PP
+.SH DESCRIPTION
+.PP
+Using a file of packed test bits as input, determines bit error
+rate.  Useful for testing fdmdv_demod.
+.PP
+.SH EXAMPLE
+ fdmdv_put_test_bits test.c2
+.PP
+.SH OPTIONS
+The first argument, 
+.IR InputBitFile
+is the file name of a file to be created with test sample data. If "-" is
+given the input is taken from stdin.
+.PP
+The optional second argument,
+.IR [Nc]
+is the number of carriers to use in the modem. The default is 14.
+The minimum is 2 and the maximum is 20.
+.PP
+.SH "SEE ALSO"
+.BR fdmdv_mod (1),
+.BR fdmdv_demod (1)
+.BR fdmdv_get_test_bits (1)

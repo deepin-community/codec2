@@ -1,0 +1,15 @@
+.TH C2ENC "1" "Aug 2010" "C2ENC" "User Commands"
+.SH NAME
+c2enc \- codec2 testing framework
+.SH DESCRIPTION
+Codec2 test and evaluation program
+.SH USAGE
+c2enc 3200|2400|1600|1400|1300|1200 InputRawspeechFile OutputBitFile [--natural]
+.SH OPTIONS
+\fB\-\-natural\fR
+use natural binary code (default is gray code)
+.PP
+Decodes a file of bits to a file of raw speech samples using codec2.
+.SH "SEE ALSO"
+.PP
+c2dec(1) c2demo(1) c2enc(1) c2sim(1) fdmdv_demod(1) fdmdv_interleave(1) fdmdv_mod(1) fdmdv_put_test_bits(1) fec_dec(1) fec_enc(1) insert_errors(1)
