@@ -1,0 +1,127 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -116,7 +116,9 @@
+ # Default options
+ #
+ option(BUILD_SHARED_LIBS
+-    "Build shared library. Set to OFF for static library." ON)
++    "Build shared library." ON)
++option(BUILD_STATIC_LIBS
++    "Build static library." ON)
+ option(UNITTEST "Build unittest binaries." OFF)
+ option(INSTALL_EXAMPLES "Install example code." OFF)
+ if(INSTALL_EXAMPLES)
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -243,6 +243,87 @@
+ # Patch level version bumps should not change API/ABI.
+ set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
+ message(STATUS "codec2 version: ${CODEC2_VERSION}")
++include_directories(${CMAKE_CURRENT_SOURCE_DIR})
++
++if(${BUILD_SHARED_LIBS} AND ${BUILD_STATIC_LIBS})
++add_library(codec2-shared SHARED ${CODEC2_SRCS})
++if(UNIX)
++    target_link_libraries(codec2-shared PUBLIC m)
++endif(UNIX)
++if(LPCNET AND lpcnetfreedv_FOUND)
++    target_link_libraries(codec2-shared PRIVATE lpcnetfreedv)
++    list(APPEND CODEC2_PUBLIC_HEADERS ${CMAKE_SOURCE_DIR}/lpcnet/src/lpcnet_freedv.h)
++endif()
++set_target_properties(codec2-shared PROPERTIES
++    OUTPUT_NAME codec2
++    CLEAN_DIRECT_OUTPUT 1
++    SOVERSION ${SOVERSION}
++    PUBLIC_HEADER "${CODEC2_PUBLIC_HEADERS}"
++)
++
++add_library(codec2-static ${CODEC2_SRCS})
++if(UNIX)
++    target_link_libraries(codec2-static PUBLIC m)
++endif(UNIX)
++if(LPCNET AND lpcnetfreedv_FOUND)
++    target_link_libraries(codec2-static PRIVATE lpcnetfreedv)
++endif()
++set_target_properties(codec2-static PROPERTIES
++    OUTPUT_NAME codec2
++    CLEAN_DIRECT_OUTPUT 1
++    PUBLIC_HEADER "${CODEC2_PUBLIC_HEADERS}"
++)
++
++add_library(codec2 INTERFACE)
++target_link_libraries(codec2 INTERFACE codec2-shared)
++
++# Required include directories for export
++target_include_directories(codec2-shared INTERFACE
++    $<INSTALL_INTERFACE:include/codec2>
++    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
++    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
++)
++target_include_directories(codec2-static INTERFACE
++    $<INSTALL_INTERFACE:include/codec2>
++    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
++    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
++)
++
++# Export config for import from full install
++install(EXPORT codec2Targets
++    FILE codec2Targets.cmake
++    NAMESPACE codec2::
++    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
++)
++
++# Export config for import from build tree.
++export(TARGETS codec2 codec2-shared
++    FILE ${CMAKE_BINARY_DIR}/codec2.cmake
++)
++
++install(TARGETS codec2 codec2-shared codec2-static EXPORT codec2Targets
++    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
++    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2 COMPONENT dev
++)
++
++file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/codec2Config.cmake"
++  "include(\${CMAKE_CURRENT_LIST_DIR}/codec2Targets.cmake)\n"
++  )
++include(CMakePackageConfigHelpers)
++write_basic_package_version_file("codec2ConfigVersion.cmake"
++  VERSION ${CODEC2_VERSION}
++  COMPATIBILITY SameMajorVersion
++  )
++install(FILES
++  "${CMAKE_CURRENT_BINARY_DIR}/codec2Config.cmake"
++   "${CMAKE_CURRENT_BINARY_DIR}/codec2ConfigVersion.cmake"
++  DESTINATION
++  ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
++  )
++
++else()
+ add_library(codec2 ${CODEC2_SRCS})
+ if(UNIX)
+     target_link_libraries(codec2 PUBLIC m)
+@@ -264,7 +345,7 @@
+ )
+ 
+ # Export config for import from full install
+-install(EXPORT codec2-config
++install(EXPORT codec2Config
+     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
+ )
+ 
+@@ -273,6 +354,14 @@
+     FILE ${CMAKE_BINARY_DIR}/codec2.cmake
+ )
+ 
++install(TARGETS codec2 EXPORT codec2Config
++    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
++    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2 COMPONENT dev
++)
++endif()
++
+ add_executable(c2enc c2enc.c)
+ target_link_libraries(c2enc codec2)
+ 

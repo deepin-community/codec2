@@ -1,7 +1,7 @@
 % tcohpsk.m
 % David Rowe Oct 2014
 %
-% Octave coherent PSK modem script that hs two modes:
+% Octave coherent PSK modem script that has two modes:
 %
 % i) tests the C port of the coherent PSK modem.  This script loads
 %    the output of unittest/tcohpsk.c and compares it to the output of
@@ -28,13 +28,13 @@
 %  [X] false sync
 %      [X] doesn't sync up on noise (used EsNo = -12)
 %      [X] similar but invalid signal like huge f off
-%  [X] ability to "unsync" when signal dissapears
+%  [X] ability to "unsync" when signal disappears
 %  [ ] some calibrated tests against FreeDV 1600
 %      + compare sound quality at various Es/Nos
 %  [ ] sync
 %      + set some req & implement
 %      [ ] way to handle eom w/o nasties
-%          + like mute ouput when signal has gone or v low snr
+%          + like mute output when signal has gone or v low snr
 %          + instantaneous snr
 %  [X] ssb tx filter with 3dB passband ripple
 %      + diverisity helped for AWGN BER 0.024 down to 0.016
@@ -201,7 +201,7 @@ acohpsk.Ns               = 4;
 acohpsk.coh_en           = 1;
 acohpsk.Nd               = Nd;
 acohpsk.modulation       = 'qpsk';
-acohpsk.do_write_pilot_file = 1;      % enable this to dump pilot symbols to C .h file, e.g. if frame params change
+acohpsk.do_write_pilot_file = 0;      % enable this to dump pilot symbols to C .h file, e.g. if frame params change
 acohpsk = symbol_rate_init(acohpsk);
 acohpsk.Ndft = 1024;
 acohpsk.f_est = afdmdv.Fcentre;
@@ -254,10 +254,12 @@ acohpsk.f_fine_est = 0;
 acohpsk.ct = 4;
 acohpsk.ftrack_en = ftrack_en;
 
-[spread spread_2ms hf_gain] = init_hf_model(Fs, frames*acohpsk.Nsymbrowpilot*afdmdv.M);
-hf_n = 1;
-nhfdelay = floor(hf_delay_ms*Fs/1000);
-ch_fdm_delay = zeros(1, acohpsk.Nsymbrowpilot*M + nhfdelay);
+if fading_en
+  [spread spread_2ms hf_gain] = init_hf_model(Fs, frames*acohpsk.Nsymbrowpilot*afdmdv.M);
+  hf_n = 1;
+  nhfdelay = floor(hf_delay_ms*Fs/1000);
+  ch_fdm_delay = zeros(1, acohpsk.Nsymbrowpilot*M + nhfdelay);
+end
 
 % simulated SSB tx filter
 
@@ -281,7 +283,7 @@ for f=1:frames
 
   tx_bits_log = [tx_bits_log tx_bits];
 
-  [tx_symb tx_bits] = bits_to_qpsk_symbols(acohpsk, tx_bits, [], []);
+  [tx_symb tx_bits] = bits_to_qpsk_symbols(acohpsk, tx_bits, []);
   tx_symb_log = [tx_symb_log; tx_symb];
   
   tx_fdm_frame = [];
@@ -609,7 +611,7 @@ else
 
   % some other useful plots
 
-  figure(1)
+  f = figure(1)
   clf
   subplot(211)
   plot(real(tx_fdm_frame_log))
@@ -618,7 +620,7 @@ else
   plot(imag(tx_fdm_frame_log))
   title('tx fdm imag');
 
-  figure(2)
+  f = figure(2)
   clf
   spec = 20*log10(abs(fft(tx_fdm_frame_log)));
   l = length(spec);
@@ -629,7 +631,7 @@ else
   xlabel('Frequency (Hz)')
   grid;
 
-  figure(3)
+  f = figure(3)
   clf;
   % plot combined signals to show diversity gains
   combined = rx_symb_log(:,1:Nc);
@@ -641,14 +643,14 @@ else
   ymax = abs(max(max(combined)));
   axis([-ymax ymax -ymax ymax])
 
-  figure(4)
+  f = figure(4)
   clf;
   subplot(211)
   plot(rx_phi_log)
   subplot(212)
   plot(rx_amp_log)
 
-  figure(5)
+  f = figure(5)
   clf;
   subplot(211)
   plot(rx_timing_log)
@@ -657,7 +659,7 @@ else
   stem(ratio_log)
   title('Sync ratio');
 
-  figure(6)
+  f = figure(6)
   clf;
   subplot(211)
   stem(nerr_log)
@@ -666,7 +668,7 @@ else
   plot(noise_rms_filt_log,'r', sig_rms_log,'g');
   title('Est rms signal and noise')
 
-  figure(7);
+  f = figure(7);
   clf;
   subplot(211)
   plot(foff_log,';freq offset;');
@@ -679,7 +681,7 @@ else
   plot(foff_log(1:length(f_est_log)) - f_est_log + Fcentre)
   title('freq offset estimation error');
 
-  figure(8)
+  f = figure(8)
   clf
   h = freqz(b,a,Fs/2);
   plot(20*log10(abs(h)))
@@ -687,7 +689,7 @@ else
   grid
   title('SSB tx filter')
 
-  figure(9)
+  f = figure(9)
   clf
   plot(error_positions_hist)    
   title('histogram of bit errors')                               
@@ -697,7 +699,7 @@ end
 
 
 % function to write C header file of noise samples so C version gives
-% extactly the same results
+% exactly the same results
 
 function write_noise_file(uvnoise_log)
 
@@ -722,22 +724,22 @@ endfunction
 
 % function to write float fading samples for use by C programs
 
-function write_noise_file(raw_file_name, Fs, dopplerSpreadHz, len_samples)
-  spread = doppler_spread(dopplerSpreadHz, Fs, len_samples);
-  spread_2ms = doppler_spread(dopplerSpreadHz, Fs, len_samples);
-  hf_gain = 1.0/sqrt(var(spread)+var(spread_2ms));
-
-  % interleave real imag samples
-
-  inter = zeros(1,len_samples*4);
-  inter(1:4) = hf_gain;
-  for i=1:len_samples
-    inter(i*4+1) = real(spread(i));
-    inter(i*4+2) = imag(spread(i));
-    inter(i*4+3) = real(spread_2ms(i));
-    inter(i*4+4) = imag(spread_2ms(i));
-  end
-  f = fopen(raw_file_name,"wb");
-  fwrite(f, inter, "float32");
-  fclose(f);
-endfunction
+%function write_noise_file(raw_file_name, Fs, dopplerSpreadHz, len_samples)
+%  spread = doppler_spread(dopplerSpreadHz, Fs, len_samples);
+%  spread_2ms = doppler_spread(dopplerSpreadHz, Fs, len_samples);
+%  hf_gain = 1.0/sqrt(var(spread)+var(spread_2ms));
+%
+%  % interleave real imag samples
+%
+%  inter = zeros(1,len_samples*4);
+%  inter(1:4) = hf_gain;
+%  for i=1:len_samples
+%    inter(i*4+1) = real(spread(i));
+%    inter(i*4+2) = imag(spread(i));
+%    inter(i*4+3) = real(spread_2ms(i));
+%    inter(i*4+4) = imag(spread_2ms(i));
+%  end
+%  f = fopen(raw_file_name,"wb");
+%  fwrite(f, inter, "float32");
+%  fclose(f);
+%endfunction

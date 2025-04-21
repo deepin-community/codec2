@@ -1,0 +1,33 @@
+name: CMake
+
+on: [pull_request]
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Debug
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install packages
+      shell: bash
+      run: |
+           sudo apt-get update
+           sudo apt-get install octave octave-common octave-signal gnuplot sox p7zip-full
+
+    - name: Build LPCNet
+      shell: bash
+      run: |
+           mkdir -p build_linux && cd build_linux 
+           cmake ..
+           make
+
+    - name: Run ctests
+      shell: bash
+      run: |
+           cd build_linux 
+           ctest -V --output-on-failure

@@ -1,0 +1,35 @@
+Author: "A. Maitland Bottoms" <bottoms@debian.org>
+Description: optional octave tests
+Forwarded: not-needed
+
+Allow build to complete even without octave available for testing.
+
+--- a/unittest/CMakeLists.txt
++++ b/unittest/CMakeLists.txt
+@@ -71,7 +71,8 @@
+ target_link_libraries(tquisk_filter codec2)
+ 
+ # Build CML as part of unit test setup
+-find_program(OCTAVE_CMD octave-cli REQUIRED)
++find_program(OCTAVE_CMD octave-cli)
++if(OCTAVE_CMD)
+ message("Octave command: ${OCTAVE_CMD}")
+ 
+ include(ExternalProject)
+@@ -95,6 +96,9 @@
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/faster_fading_samples.float
+   COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./fading_files.sh ${CMAKE_CURRENT_BINARY_DIR}
+ )
++else()
++message("No Octave: expect octave-using tests to fail")
++endif()
+ 
+ add_executable(freedv_700d_comptx freedv_700d_comptx.c)
+ add_executable(freedv_700d_comprx freedv_700d_comprx.c)
+@@ -120,4 +124,4 @@
+ target_link_libraries(vq_mbest codec2)
+ 
+ add_executable(tesno_est tesno_est.c)
+-target_link_libraries(tesno_est m codec2)
+\ No newline at end of file
++target_link_libraries(tesno_est m codec2)

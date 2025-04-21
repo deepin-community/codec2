@@ -1,0 +1,26 @@
+From bbd9cabaf568fc119c3066644fb4cc32a11e85b3 Mon Sep 17 00:00:00 2001
+From: "A. Maitland Bottoms" <bottoms@debian.org>
+Date: Sun, 17 Jul 2022 17:20:16 -0400
+Subject: [PATCH 3/4] install executables
+
+So that packages can include these codec2 utilities.
+---
+ src/CMakeLists.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -387,3 +387,13 @@
+     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2 COMPONENT dev
+ )
++
++install(TARGETS
++    c2enc
++    c2dec
++    fdmdv_get_test_bits
++    fdmdv_mod fdmdv_demod
++    fsk_mod
++    fdmdv_put_test_bits
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++)

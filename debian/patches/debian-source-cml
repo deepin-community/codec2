@@ -1,0 +1,41 @@
+From 6e18651d7204b618501db3dcb3de700ac00f4f42 Mon Sep 17 00:00:00 2001
+From: "A. Maitland Bottoms" <bottoms@debian.org>
+Date: Sun, 17 Jul 2022 17:22:01 -0400
+Subject: [PATCH 4/4] debian source cml
+
+Debian source packages include cml source, so use it rather
+than let CMake fetch it from the git repository.
+---
+ CMakeLists.txt          | 2 +-
+ unittest/CMakeLists.txt | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1390,6 +1390,6 @@
+         test_fsk_lib_4fsk_ldpc
+         test_OFDM_modem_datac0_compression
+         PROPERTIES
+-        ENVIRONMENT "CML_PATH=${CMAKE_CURRENT_BINARY_DIR}/cml"
++        ENVIRONMENT "CML_PATH=${PROJECT_SOURCE_DIR}/cml"
+     )
+ endif(UNITTEST)
+--- a/unittest/CMakeLists.txt
++++ b/unittest/CMakeLists.txt
+@@ -75,13 +75,13 @@
+ message("Octave command: ${OCTAVE_CMD}")
+ 
+ include(ExternalProject)
+-set(CML_PATH ${CMAKE_CURRENT_BINARY_DIR}/../cml)
++set(CML_PATH ${CMAKE_CURRENT_BINARY_DIR}/../../cml)
+ ExternalProject_Add(cml
+-   GIT_REPOSITORY https://github.com/drowe67/cml.git
++   # GIT_REPOSITORY https://github.com/drowe67/cml.git
+    SOURCE_DIR ${CML_PATH}
+    BUILD_IN_SOURCE 1
+    CONFIGURE_COMMAND true # No configuration required
+-   BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../cml && make
++   BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../../cml && make
+    INSTALL_COMMAND true # No installation required
+ )
+ 

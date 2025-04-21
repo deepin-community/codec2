@@ -7,135 +7,89 @@
 
 #{
   Examples:
- 
-  i) 10 seconds, AWGN channel at Eb/No=3dB
 
-    octave:4> ofdm_tx('awgn_ebno_3dB_700d.raw', "700D", 10, 3);
+  i) 10 seconds, AWGN channel at SNR3k=3dB
 
-  ii) 10 seconds, HF channel at Eb/No=6dB
+    octave:4> ofdm_tx("awgn_snr_3dB_700d.raw", "700D", 10, 3)
 
-    ofdm_tx('hf_ebno_6dB_700d.raw',  "700D", 10, 6, 'hf');
+  ii) 10 seconds, multipath poor channel at SNR=6dB
+
+    octave:5> ofdm_tx("hf_snr_6dB_700d.raw", "700D", 10, 6, "mpp")
     
-  iii) 10 seconds, 2200 waveform, AWGN channel, Eb/No=100dB (effectively noise free)
+  iii) Data mode example, three bursts of one packet each, SNR=100dB:
+  
+    octave:6> ofdm_tx("test_datac0.raw","datac0",1,100,"awgn","bursts",3)
 
-    ofdm_tx('hf_ebno_6dB_700d.raw',  "2200", 10);
 #}
 
-% Note EbNodB is for payload data bits, so will be 10log10(rate) higher than
-% raw EbNodB used in ofdm_tx() at uncoded bit rate
-
-function ofdm_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0, initial_noise_sams=0, tx_filter=0)
+function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin)
   ofdm_lib;
+  channel_lib;
+  randn('seed',1);
+  pkg load signal;
 
-  % init modem
+  tx_clip_en = 0; freq_offset_Hz = 0.0; burst_mode = 0; Nbursts = 1;
+  i = 1;
+  while i<=length(varargin)
+    if strcmp(varargin{i},"txclip") 
+      tx_clip_en = 1;
+    elseif strcmp(varargin{i},"bursts") 
+      burst_mode = 1;
+      Nbursts = varargin{i+1}; i++;
+    else
+      printf("\nERROR unknown argument: [%d] %s \n", i ,varargin{i});
+      return;
+    end
+    i++;
+  end
   
-  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode)
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  % init modem
+
+  config = ofdm_init_mode(mode);
+  states = ofdm_init(config);  
   print_config(states);
   ofdm_load_const;
 
-  % Generate fixed test frame of tx bits and run OFDM modulator
+  if burst_mode
+    % burst mode: treat N as Npackets
+    Npackets = N; 
+ else
+    % streaming mode: treat N as Nseconds
+    Npackets = round(N/states.Tpacket);
+  end
 
-  Nrows = Nsec*Rs;
-  Nframes = floor((Nrows-1)/Ns);
+  % Generate fixed test frame of tx bits and concatenate packets
+
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
-
+  atx = ofdm_mod(states, tx_bits);
   tx = [];
-  for f=1:Nframes
-    tx = [tx ofdm_mod(states, tx_bits)];
+  for f=1:Npackets
+    tx = [tx atx];
+  end
+  if length(states.data_mode)
+    % note postamble provides a "column" of pilots at the end of the burst
+    tx = [states.tx_preamble tx states.tx_postamble];
   end
   
-  Nsam = length(tx);
-
-  % channel simulation
-
-  EsNo = rate * bps * (10 .^ (EbNodB/10));
-  variance = 1/(M*EsNo/2);
-  woffset = 2*pi*freq_offset_Hz/Fs;
-  dwoffset = 2*pi*dfoff_hz_per_sec/(Fs*Fs);
-  
-  SNRdB = EbNodB + 10*log10(Nc*bps*Rs/3000);
-  printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz ", EbNodB, SNRdB, freq_offset_Hz);
-
-  % set up HF model ---------------------------------------------------------------
-
-  if strcmp(channel, 'hf')
-    randn('seed',1);
-
-    % some typical values, or replace with user supplied
-
-    dopplerSpreadHz = 1; path_delay_ms = 1;
-
-    path_delay_samples = path_delay_ms*Fs/1000;
-    printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n",
-           dopplerSpreadHz, path_delay_ms, path_delay_samples);
-
-    % generate same fading pattern for every run
-
-    randn('seed',1);
-
-    spread1 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
-    spread2 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
-
-    % sometimes doppler_spread() doesn't return exactly the number of samples we need
- 
-    assert(length(spread1) >= Nsam, "not enough doppler spreading samples");
-    assert(length(spread2) >= Nsam, "not enough doppler spreading samples");
-  end
-
-  % experimental coarse amplitude quantisation
-
-  quant_tx = 0;
-  if quant_tx
-    tx_re = real(tx); tx_im = imag(tx);
-    tx_re = min(tx_re,0.5); tx_re = max(tx_re,-0.5);
-    tx_im = min(tx_im,0.5); tx_im = max(tx_im,-0.5);
-    step = 0.05/4;
-    tx_re = step*round(tx_re/step);
-    tx_im = step*round(tx_im/step);
-    tx = tx_re + j*tx_im;
-    figure(1); clf; subplot(211); plot(real(tx(1:100)),'+-'); subplot(212); plot(imag(tx(1:100)),'+-'); 
+  % if burst mode concatenate multiple bursts with spaces
+  if burst_mode
+    atx = tx; tx = zeros(1,states.Fs); on_time = 0; off_time = states.Fs;
+    for b=1:Nbursts
+      tx = [tx atx zeros(1,states.Fs)];
+      on_time += length(atx);
+      off_time += states.Fs;
+    end
+    % adjust channel simulator SNR setpoint given (burst on length)/(total length including silence) ratio
+    mark_space_SNR_offset = 10*log10(on_time/(on_time+off_time));
+    SNRdB_setpoint = SNR3kdB + mark_space_SNR_offset;
+    printf("SNR3kdB: %4.2f Burst offset: %4.2f SNRdB_setpoint: %4.2f\n", SNR3kdB, mark_space_SNR_offset, SNRdB_setpoint)
+  else
+    SNRdB_setpoint = SNR3kdB; % no adjustment to SNR in streaming mode
   end
   
-  rx = tx;
-  if tx_filter
-    bpf_coeff = make_ofdm_bpf(write_c_header_file=0);
-    rx = filter(bpf_coeff,1,tx);
-    figure(1); clf;
-    subplot(211);
-    plot((1:length(tx))*8000/length(tx), 20*log10(abs(fft(tx))))
-    axis([1 4000 0 60])
-    subplot(212);
-    plot((1:length(tx))*8000/length(tx), 20*log10(abs(fft(rx))))
-    axis([1 4000 0 60])
-  end
-  
-  if strcmp(channel, 'hf')
-    rx  = tx(1:Nsam) .* spread1(1:Nsam);
-    rx += [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)] .* spread2(1:Nsam);
-
-    % normalise rx power to same as tx
-
-    nom_rx_pwr = 2/(Ns*(M*M)) + Nc/(M*M);
-    rx_pwr = var(rx);
-    rx *= sqrt(nom_rx_pwr/rx_pwr);
-  end
-
-  phase_offset = woffset*(1:Nsam) + 0.5*dwoffset*((1:Nsam).^2);
-  rx = rx .* exp(j*phase_offset);
-
-  rx = [zeros(1,initial_noise_sams) rx];
-  Nsam = length(rx);
-  
-  % note variance/2 as we are using real() operator, mumble,
-  % reflection of -ve freq to +ve, mumble, hand wave
-
-  randn('seed',1);
-  noise = sqrt(variance/2)*0.5*randn(1,Nsam);
-  rx = real(rx) + noise;
-  printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise))+10*log10(4000) - 10*log10(3000));
-
-  % adjusted by experiment to match rms power of early test signals
-
-  frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
+  printf("Npackets: %d  Nbursts: %d  ", Npackets, Nbursts);
+  states.verbose=1;
+  tx = ofdm_hilbert_clipper(states, tx, tx_clip_en);
+  rx_real = ofdm_channel(states, tx, SNRdB_setpoint, channel, freq_offset_Hz);
+  frx = fopen(filename,"wb"); fwrite(frx, rx_real, "short"); fclose(frx);
 endfunction

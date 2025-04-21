@@ -6,14 +6,14 @@
 %
 % Useful for of line analysis of a demod run
 
-function ofdm_demod_c(filename)
+function ofdm_demod_c(filename, mode="700D")
   ofdm_lib;
   more off;
 
   % init modem
 
-  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  config = ofdm_init_mode(mode);
+  states = ofdm_init(config);
   ofdm_load_const;
   states.verbose = 0;
 
@@ -40,9 +40,4 @@ function ofdm_demod_c(filename)
   axis([1 max(length(foff_hz_log_c),2) -mx mx]);
   title('Fine Freq');
   ylabel('Hz')
-
-  figure(5); clf;
-  plot(snr_est_log_c);
-  ylabel('SNR (dB)')
-  title('SNR Estimates')
 endfunction

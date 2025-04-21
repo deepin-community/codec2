@@ -21,23 +21,12 @@ ldpc
 global passes = 0;
 global fails = 0;
 
-% attempt to start up CML, path will be different on your machine
-
-path_to_cml = '~/cml';
-addpath(strcat(path_to_cml, "/mex"), strcat(path_to_cml, "/mat"));
-cml_support = 0;
-if exist("Somap") == 0
-  printf("Can't find CML mex directory so we won't run those tests for now...\n");
-else
-  printf("OK found CML mex directory so will add those tests...\n");
-  cml_support = 1;
-end
+init_cml()
+cml_support = 1
 
 % ---------------------------------------------------------------------
 % Run Octave version 
 % ---------------------------------------------------------------------
-
-Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2;
 
 % useful to test the modem at other Nc's, but if Nc != 17 we aren't set up for
 % LDPC testing so disable
@@ -49,8 +38,9 @@ else
 end
 printf("Nc = %d LDPC testing: %d\n", Nc, cml_support);
 
-Ns = 8;
-states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+config = ofdm_init_mode("700D");
+config.Nc = Nc;
+states = ofdm_init(config);
 states.verbose = 0;
 ofdm_load_const;
 
@@ -114,7 +104,7 @@ timing_est_log = timing_valid_log = timing_mx_log = [];
 coarse_foff_est_hz_log = []; sample_point_log = [];
 phase_est_pilot_log = []; rx_amp_log = [];
 rx_np_log = []; rx_bits_log = [];
-sig_var_log = noise_var_log = mean_amp_log = [];
+snr_log = []; mean_amp_log = [];
 
 states.timing_en = 1;
 states.foff_est_en = 1;
@@ -141,14 +131,14 @@ for f=1:Nframes
   end
   prx += lnew;
 
-  [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+  [states rx_bits achannel_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
   
   % log some states for comparison to C
 
   rxbuf_in_log = [rxbuf_in_log rxbuf_in];
   rxbuf_log = [rxbuf_log states.rxbuf];
   rx_sym_log = [rx_sym_log; states.rx_sym];
-  phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
+  phase_est_pilot_log = [phase_est_pilot_log; angle(achannel_est_pilot_log)];
   rx_amp_log = [rx_amp_log arx_amp];
   foff_hz_log = [foff_hz_log; states.foff_est_hz];
   timing_est_log = [timing_est_log; states.timing_est];
@@ -158,9 +148,10 @@ for f=1:Nframes
   sample_point_log = [sample_point_log; states.sample_point];
   rx_np_log = [rx_np_log arx_np];
   rx_bits_log = [rx_bits_log rx_bits];
-  sig_var_log = [sig_var_log; states.sig_var];
-  noise_var_log = [noise_var_log; states.noise_var];
   mean_amp_log = [mean_amp_log; states.mean_amp];
+  EsNo_estdB = esno_est_calc(arx_np);
+  SNR_estdB = snr_from_esno(states, EsNo_estdB);
+  snr_log = [snr_log; SNR_estdB];
   
   % Optional testing of LDPC functions
 
@@ -216,8 +207,8 @@ load tofdm_out.txt;
 
 fg = 1;
 
-figure(fg++); clf; plot(rx_np_log,'+'); title('Octave Scatter Diagram'); axis([-1.5 1.5 -1.5 1.5]);
-figure(fg++); clf; plot(rx_np_log_c,'+'); title('C Scatter Diagram'); axis([-1.5 1.5 -1.5 1.5]);
+f = figure(fg++); clf; plot(rx_np_log,'+'); title('Octave Scatter Diagram'); axis([-1.5 1.5 -1.5 1.5]);
+f = figure(fg++); clf; plot(rx_np_log_c,'+'); title('C Scatter Diagram'); axis([-1.5 1.5 -1.5 1.5]);
 
 stem_sig_and_error(fg++, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits_log) -1.5 1.5])
 
@@ -275,8 +266,7 @@ if cml_support
   check(bit_likelihood_log, bit_likelihood_log_c, 'bit_likelihood_log');
   check(detected_data_log, detected_data_log_c, 'detected_data');
 end
-check(sig_var_log, sig_var_log_c, 'sig_var_log');
-check(noise_var_log, noise_var_log_c, 'noise_var_log');
 check(mean_amp_log, mean_amp_log_c, 'mean_amp_log');
+check(snr_log, snr_log_c, 'snr_log');
 printf("\npasses: %d fails: %d\n", passes, fails);
 

@@ -1,24 +1,37 @@
 #!/usr/bin/make -f
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+  RUN_UNITTEST := TRUE
+else
+  RUN_UNITTEST := FALSE
+endif
 
 %:
 	dh $@ --builddirectory=Build --buildsystem=cmake
 
 override_dh_auto_configure:
+	dh_auto_configure --builddirectory=Build/lpcnet-build --sourcedirectory=LPCNet -- \
+	-DCMAKE_VERBOSE_MAKEFILE=ON -DDISABLE_CPU_OPTIMIZATION=ON \
+	-DLPCNET_191005_DIR=$(CURDIR)/lpcnet191005
+	cmake --build Build/lpcnet-build
 	dh_auto_configure --builddirectory=Build -- \
-	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	-DLPCNET_BUILD_DIR=$(CURDIR)/Build/lpcnet-build \
+	-DBUILD_STATIC_LIBS=ON \
 	-DINSTALL_EXAMPLES=TRUE \
-	-DUNITTEST=TRUE
+	-DUNITTEST=$(RUN_UNITTEST) \
+	-DCMAKE_BUILD_TYPE=RelWithDebInfo
 
 override_dh_auto_build:
-	dh_auto_build --builddirectory=Build
-	dh_auto_configure --builddirectory=Build/lpcnet-build --sourcedirectory=lpcnet -- \
-	-DCMAKE_VERBOSE_MAKEFILE=ON -DDISABLE_CPU_OPTIMIZATION=ON -DCODEC2_BUILD_DIR=$(CURDIR)/Build
-	cd Build/lpcnet-build && cmake --build .
-	cd Build && cmake -DLPCNET_BUILD_DIR=lpcnet-build ..
-	cd Build && cmake --build .
+	echo "lpcnet-build"
+	cmake --build Build/lpcnet-build
+	echo "codec2 build to use lpcnet"
+	cmake --build Build
 
+# Some tests are known to fail while building packages:
+# - not using resource-intensive valgrind for leakage tests
+# - some octave based tests fail without a full graphical environment
+# - HF fading files require the octave-signal package
+# - some tests use sox
 override_dh_auto_test:
-	- override_dh_auto_test
-
-override_dh_acc:
-	- dh_acc $@
+	- dh_auto_test

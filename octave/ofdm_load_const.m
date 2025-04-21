@@ -5,19 +5,22 @@ bps = states.bps;
 Rs = states.Rs;
 Tcp = states.Tcp;
 Ns = states.Ns;
+Np = states.Np;
 Nc = states.Nc;
 M = states.M;
 Ncp = states.Ncp;
 bps = states.bps;
 Nbitsperframe = states.Nbitsperframe;
-Nrowsperframe = states.Nrowsperframe;
+Nbitsperpacket = states.Nbitsperpacket;
+Nsampersymbol = states.Nsampersymbol;
 Nsamperframe = states.Nsamperframe;
-timing_mx_thresh = 0.35;
+timing_mx_thresh = states.timing_mx_thresh;
 Nuwbits = states.Nuwbits;
 Ntxtbits = states.Ntxtbits;
 tx_uw =  states.tx_uw;
 uw_ind = states.uw_ind;
 uw_ind_sym = states.uw_ind_sym;
+Nuwframes=states.Nuwframes;
 
 W = states.W;
 w = states.w;
@@ -28,6 +31,8 @@ ftwindow_width = states.ftwindow_width;
 
 Nrxbuf = states.Nrxbuf;
 rxbuf = states.rxbuf;
+rxbufst = states.rxbufst;
+Nrxbufmin = states.Nrxbufmin;
 
 pilots = states.pilots;
 rate_fs_pilot_samples = states.rate_fs_pilot_samples;
@@ -49,4 +54,4 @@ if ldpc_en
 end
 
 verbose = states.verbose;
-
+ofdm_peak = states.ofdm_peak;

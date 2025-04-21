@@ -2,8 +2,15 @@ Source: codec2
 Section: sound
 Priority: optional
 Maintainer: A. Maitland Bottoms <bottoms@debian.org>
-Build-Depends: cmake, debhelper-compat (= 13), libsamplerate0-dev, libspeexdsp-dev
-Standards-Version: 4.5.0
+Build-Depends: clang-format [amd64],
+               cmake,
+               debhelper-compat (= 13),
+               libsamplerate0-dev,
+               libspeexdsp-dev,
+               octave-dev [amd64] <!nocheck>,
+               octave-signal [amd64] <!nocheck>,
+               sox [amd64] <!nocheck>
+Standards-Version: 4.7.0
 Rules-Requires-Root: no
 Homepage: http://rowetel.com/codec2.html
 Vcs-Browser: https://salsa.debian.org/bottoms/pkg-codec2
@@ -18,17 +25,7 @@ Description: command line tools for handling Codec2 data
  .
  This package contains the encoder and decoder command-line applications.
 
-Package: codec2-examples
-Architecture: all
-Depends: ${misc:Depends}, python3
-Suggests: octave
-Description: Codec2 sample data and examples
- Codec2 is an audio codec especially designed for compressing voice at
- very low bit-rates for applications such as digital voice radio.
- .
- This package contains sample data and supporting examples.
-
-Package: libcodec2-0.9
+Package: libcodec2-1.2
 Section: libs
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
@@ -46,8 +43,9 @@ Package: libcodec2-dev
 Architecture: any
 Section: libdevel
 Pre-Depends: ${misc:Pre-Depends}
-Depends: libcodec2-0.9 (= ${binary:Version}), ${misc:Depends}
-Suggests: pkg-config
+Depends: libcodec2-1.2 (= ${binary:Version}), ${misc:Depends}
+Suggests: pkgconf
+Multi-Arch: same
 Description: Codec2 library development files
  Codec2 is an audio codec especially designed for compressing voice at
  very low bit-rates for applications such as digital voice radio.

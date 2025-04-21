@@ -4,8 +4,7 @@
 
 set(D ${CMAKE_CURRENT_SOURCE_DIR}/codebook)
 
-# lsp quantisers
-
+# lsp quantisers (2400/1400/1300 modes)
 set(CODEBOOKS
     ${D}/lsp1.txt
     ${D}/lsp2.txt
@@ -19,8 +18,7 @@ set(CODEBOOKS
     ${D}/lsp10.txt
 )
 
-# lspd quantisers
-
+# lspd quantisers (3200 mode)
 set(CODEBOOKSD
     ${D}/dlsp1.txt
     ${D}/dlsp2.txt
@@ -34,29 +32,17 @@ set(CODEBOOKSD
     ${D}/dlsp10.txt
 )
 
-set(CODEBOOKSJVM
-    ${D}/lspjvm1.txt
-    ${D}/lspjvm2.txt
-    ${D}/lspjvm3.txt
+# LSP VQ (1200 mode)
+set(CODEBOOKSJMV
+    ${D}/lspjmv1.txt
+    ${D}/lspjmv2.txt
+    ${D}/lspjmv3.txt
 )
 
-set(CODEBOOKSMEL
-    ${D}/mel1.txt
-    ${D}/mel2.txt
-    ${D}/mel3.txt
-    ${D}/mel4.txt
-    ${D}/mel5.txt
-    ${D}/mel6.txt
-)
-
-set(CODEBOOKSLSPMELVQ
-    ${D}/lspmelvq1.txt
-    ${D}/lspmelvq2.txt
-    ${D}/lspmelvq3.txt
-)
-
+# Joint Wo-energy VQ (1200 mode)
 set(CODEBOOKSGE ${D}/gecb.txt)
 
+# 700C two stage VQ
 set(CODEBOOKSNEWAMP1
     ${D}/train_120_1.txt
     ${D}/train_120_2.txt
@@ -66,6 +52,7 @@ set(CODEBOOKSNEWAMP1_ENERGY
     ${D}/newamp1_energy_q.txt
 )
 
+# 450 mode two stage VQ
 set(CODEBOOKSNEWAMP2
     ${D}/codes_450.txt
 )
@@ -76,21 +63,25 @@ set(CODEBOOKSNEWAMP2_ENERGY
 
 # when crosscompiling we need a native executable
 if(CMAKE_CROSSCOMPILING)
+    set(CMAKE_DISABLE_SOURCE_CHANGES OFF)
     include(ExternalProject)
     ExternalProject_Add(codec2_native
-       SOURCE_DIR ${CMAKE_SOURCE_DIR}
-       BUILD_COMMAND $(MAKE) generate_codebook
-       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy src/generate_codebook ${CMAKE_CURRENT_BINARY_DIR}
+       SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..
+       BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/codec2_native
+       BUILD_COMMAND ${CMAKE_COMMAND} --build . --target generate_codebook
+       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/codec2_native/src/generate_codebook ${CMAKE_CURRENT_BINARY_DIR}
+       BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook
     )
     add_executable(generate_codebook IMPORTED)
     set_target_properties(generate_codebook PROPERTIES
         IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook)
     add_dependencies(generate_codebook codec2_native)
+    set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 else(CMAKE_CROSSCOMPILING)
 # Build code generator binaries. These do not get installed.
     # generate_codebook
     add_executable(generate_codebook generate_codebook.c)
-    target_link_libraries(generate_codebook m ${CMAKE_REQUIRED_LIBRARIES})
+    target_link_libraries(generate_codebook m)
     # Make native builds available for cross-compiling.
     export(TARGETS generate_codebook
         FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
@@ -111,26 +102,11 @@ add_custom_command(
     DEPENDS generate_codebook ${CODEBOOKSD}
 )
 
-# codebookjvm.c
+# codebookjmv.c
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookjvm.c
-    COMMAND generate_codebook lsp_cbjvm ${CODEBOOKSJVM} > ${CMAKE_CURRENT_BINARY_DIR}/codebookjvm.c
-    DEPENDS generate_codebook ${CODEBOOKSJVM}
-)
-
-
-# codebookmel.c
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookmel.c
-    COMMAND generate_codebook mel_cb ${CODEBOOKSMEL} > ${CMAKE_CURRENT_BINARY_DIR}/codebookmel.c
-    DEPENDS generate_codebook ${CODEBOOKSMEL}
-)
-
-# codebooklspmelvq.c
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebooklspmelvq.c
-    COMMAND generate_codebook lspmelvq_cb ${CODEBOOKSLSPMELVQ} > ${CMAKE_CURRENT_BINARY_DIR}/codebooklspmelvq.c
-    DEPENDS generate_codebook ${CODEBOOKSLSPMELVQ}
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookjmv.c
+    COMMAND generate_codebook lsp_cbjmv ${CODEBOOKSJMV} > ${CMAKE_CURRENT_BINARY_DIR}/codebookjmv.c
+    DEPENDS generate_codebook ${CODEBOOKSJMV}
 )
 
 # codebookge.c
@@ -186,7 +162,6 @@ set(CODEC2_SRCS
     fm.c
     fsk.c
     fmfsk.c
-    tdma.c
     kiss_fft.c
     kiss_fftr.c
     linreg.c
@@ -194,16 +169,14 @@ set(CODEC2_SRCS
     lsp.c
     mbest.c
     newamp1.c
-    newamp2.c
     ofdm.c
+    ofdm_mode.c
     phase.c
     quantise.c
     pack.c
     codebook.c
     codebookd.c
-    codebookjvm.c
-    codebookmel.c
-    codebooklspmelvq.c
+    codebookjmv.c
     codebookge.c
     codebooknewamp1.c
     codebooknewamp1_energy.c
@@ -211,6 +184,10 @@ set(CODEC2_SRCS
     codebooknewamp2_energy.c
     golay23.c
     freedv_api.c
+    freedv_1600.c
+    freedv_700.c
+    freedv_2020.c
+    freedv_fsk.c
     freedv_vhf_framing.c
     freedv_data_channel.c
     varicode.c
@@ -221,14 +198,24 @@ set(CODEC2_SRCS
     gp_interleaver.c
     interldpc.c
     filter.c
-    horus_api.c
-    horus_l2.c
     HRA_112_112.c
+    HRA_56_56.c
     HRAb_396_504.c
+    H_256_768_22.c
+    H_256_512_4.c
+    HRAa_1536_512.c
+    H_128_256_5.c
+    H_2064_516_sparse.c
+    H_4096_8192_3d.c
+    H_16200_9720.c
+    H_1024_2048_4f.c
+    H_212_158.c
+    ldpc_codes.c
+    lpcnet_freq.c
+    reliable_text.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
-    golay23.h
     codec2.h
     codec2_fdmdv.h
     codec2_cohpsk.h
@@ -237,14 +224,10 @@ set(CODEC2_PUBLIC_HEADERS
     fsk.h
     codec2_fifo.h
     comp.h
-    comp_prim.h
     modem_stats.h
-    kiss_fft.h
     freedv_api.h
-    varicode.h
-    freedv_api_internal.h
-    filter.h
-    horus_api.h
+    reliable_text.h
+    codec2_math.h
     ${CODEC2_VERSION_PATH}/version.h
 )
 
@@ -256,12 +239,15 @@ set(CODEC2_PUBLIC_HEADERS
 #
 # Setup the codec2 library
 #
+# Patch level version bumps should not change API/ABI.
+set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
+message(STATUS "codec2 version: ${CODEC2_VERSION}")
 add_library(codec2 ${CODEC2_SRCS})
 if(UNIX)
-    target_link_libraries(codec2 m)
+    target_link_libraries(codec2 PUBLIC m)
 endif(UNIX)
 if(LPCNET AND lpcnetfreedv_FOUND)
-    target_link_libraries(codec2 lpcnetfreedv)
+    target_link_libraries(codec2 PRIVATE lpcnetfreedv)
 endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(codec2 PROPERTIES
@@ -286,142 +272,116 @@ export(TARGETS codec2
     FILE ${CMAKE_BINARY_DIR}/codec2.cmake
 )
 
-add_executable(c2demo c2demo.c)
-target_link_libraries(c2demo ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
 add_executable(c2enc c2enc.c)
-target_link_libraries(c2enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(c2enc codec2)
 
 add_executable(c2dec c2dec.c)
-target_link_libraries(c2dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(c2dec codec2)
 
-add_executable(c2sim c2sim.c)
-target_link_libraries(c2sim ${CMAKE_REQUIRED_LIBRARIES} codec2)
+add_executable(c2sim c2sim.c sd.c)
+target_link_libraries(c2sim codec2)
 
 add_executable(fdmdv_get_test_bits fdmdv_get_test_bits.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
-target_link_libraries(fdmdv_get_test_bits m ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fdmdv_get_test_bits m)
 
 add_executable(fdmdv_mod fdmdv_mod.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
-target_link_libraries(fdmdv_mod m ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fdmdv_mod m)
 
 add_executable(fdmdv_demod fdmdv_demod.c fdmdv.c kiss_fft.c octave.c modem_stats.c codec2_fft.c kiss_fftr.c)
-target_link_libraries(fdmdv_demod m ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fdmdv_demod m)
 
 add_executable(fdmdv_put_test_bits fdmdv_put_test_bits.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
-target_link_libraries(fdmdv_put_test_bits m ${CMAKE_REQUIRED_LIBRARIES})
-
-add_executable(fdmdv_channel fdmdv_channel.c)
-target_link_libraries(fdmdv_channel ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_executable(insert_errors insert_errors.c)
-target_link_libraries(insert_errors ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fdmdv_put_test_bits m)
 
 add_executable(freedv_tx freedv_tx.c)
-target_link_libraries(freedv_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(freedv_tx codec2)
 
 add_executable(freedv_rx freedv_rx.c)
-target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(freedv_rx codec2)
+
+add_executable(freedv_data_raw_tx freedv_data_raw_tx.c)
+target_link_libraries(freedv_data_raw_tx codec2)
+
+add_executable(freedv_data_raw_rx freedv_data_raw_rx.c octave.c)
+target_link_libraries(freedv_data_raw_rx codec2)
+
+add_executable(freedv_data_tx freedv_data_tx.c)
+target_link_libraries(freedv_data_tx codec2)
+
+add_executable(freedv_data_rx freedv_data_rx.c)
+target_link_libraries(freedv_data_rx codec2)
+
+add_executable(freedv_mixed_tx freedv_mixed_tx.c)
+target_link_libraries(freedv_mixed_tx codec2)
+
+add_executable(freedv_mixed_rx freedv_mixed_rx.c)
+target_link_libraries(freedv_mixed_rx codec2)
 
 add_executable(fsk_mod fsk_mod.c)
-target_link_libraries(fsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_executable(fsk_mod_ext_vco fsk_mod_ext_vco.c)
-target_link_libraries(fsk_mod_ext_vco m ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fsk_mod codec2)
 
 add_executable(fsk_demod fsk_demod.c modem_probe.c octave.c)
-target_link_libraries(fsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(fsk_demod codec2)
 
 add_executable(fsk_get_test_bits fsk_get_test_bits.c)
 target_link_libraries(fsk_get_test_bits)
 
 add_executable(fsk_put_test_bits fsk_put_test_bits.c)
-target_link_libraries(fsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(fsk_put_test_bits codec2)
 
-add_executable(fm_demod fm_demod.c fm.c)
-target_link_libraries(fm_demod m ${CMAKE_REQUIRED_LIBRARIES})
+add_executable(framer framer.c)
+target_link_libraries(framer)
+
+add_executable(deframer deframer.c)
+target_link_libraries(deframer)
 
 add_executable(cohpsk_mod cohpsk_mod.c)
-target_link_libraries(cohpsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(cohpsk_mod codec2)
 
 add_executable(ofdm_get_test_bits ofdm_get_test_bits.c)
-target_link_libraries(ofdm_get_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_executable(ofdm_gen_test_bits ofdm_gen_test_bits.c)
-target_link_libraries(ofdm_gen_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(ofdm_get_test_bits codec2)
 
 add_executable(ofdm_put_test_bits ofdm_put_test_bits.c)
-target_link_libraries(ofdm_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(ofdm_put_test_bits codec2)
 
 add_executable(ofdm_mod ofdm_mod.c)
-target_link_libraries(ofdm_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(ofdm_mod codec2)
 
 add_executable(ofdm_demod ofdm_demod.c octave.c)
-target_link_libraries(ofdm_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_executable(fmfsk_mod fmfsk_mod.c)
-target_link_libraries(fmfsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_executable(fmfsk_demod fmfsk_demod.c modem_probe.c octave.c)
-target_link_libraries(fmfsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(ofdm_demod codec2)
 
 add_executable(vhf_deframe_c2 vhf_deframe_c2.c)
-target_link_libraries(vhf_deframe_c2  ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(vhf_deframe_c2  codec2)
 
 add_executable(vhf_frame_c2 vhf_frame_c2.c)
-target_link_libraries(vhf_frame_c2  ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(vhf_frame_c2  codec2)
 
 add_executable(cohpsk_demod cohpsk_demod.c octave.c)
-target_link_libraries(cohpsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(cohpsk_demod codec2)
 
 add_executable(cohpsk_get_test_bits cohpsk_get_test_bits.c)
-target_link_libraries(cohpsk_get_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(cohpsk_get_test_bits codec2)
 
 add_executable(cohpsk_put_test_bits cohpsk_put_test_bits.c octave.c)
-target_link_libraries(cohpsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(cohpsk_put_test_bits codec2)
 
-add_executable(cohpsk_ch cohpsk_ch.c)
-target_link_libraries(cohpsk_ch ${CMAKE_REQUIRED_LIBRARIES} codec2)
+add_executable(ch ch.c)
+target_link_libraries(ch codec2)
+
+add_executable(tollr tollr.c)
 
 add_executable(ldpc_noise ldpc_noise.c)
 target_link_libraries(ldpc_noise m)
 
 add_executable(ldpc_enc ldpc_enc.c)
-target_link_libraries(ldpc_enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(ldpc_enc codec2)
 
 add_executable(ldpc_dec ldpc_dec.c)
-target_link_libraries(ldpc_dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_executable(drs232 drs232.c)
-target_link_libraries(drs232 ${CMAKE_REQUIRED_LIBRARIES})
-
-add_executable(drs232_ldpc drs232_ldpc.c)
-target_link_libraries(drs232_ldpc ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_definitions(-DHORUS_L2_RX -DINTERLEAVER -DSCRAMBLER -DRUN_TIME_TABLES)
-add_executable(horus_demod horus_demod.c horus_api.c horus_l2.c golay23.c fsk.c kiss_fft.c)
-target_link_libraries(horus_demod m ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(ldpc_dec codec2)
 
 install(TARGETS codec2 EXPORT codec2-config
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2
-)
-
-#install(EXPORT codec2-config
-#    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
-#)
-
-install(TARGETS
-    c2enc
-    c2dec
-    fdmdv_get_test_bits
-    fdmdv_mod fdmdv_demod
-    fm_demod
-    fsk_mod
-    fdmdv_put_test_bits
-    insert_errors
-    drs232
-    drs232_ldpc
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2 COMPONENT dev
 )

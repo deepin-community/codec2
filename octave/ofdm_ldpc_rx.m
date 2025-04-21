@@ -3,105 +3,91 @@
 %
 % OFDM file based rx, with LDPC and interleaver, Octave version of src/ofdm_demod.c
 
-function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_pattern_filename, start_secs, len_secs=0)
+#{
+    1. Streaming mode operation:
+  
+       ofdm_ldpc_rx("test_700d.raw","700D")
+    
+    2. Burst mode, tell state machine there is one packet in each burst:
+    
+       ofdm_ldpc_rx("test_datac0.raw","datac0","packetsperburst",1)
+       
+#}
+
+function ofdm_ldpc_rx(filename, mode="700D", varargin)
   ofdm_lib;
   ldpc;
   gp_interleaver;
   more off;
+  pkg load signal;
 
   % init modem
 
-  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  config = ofdm_init_mode(mode);
+  states = ofdm_init(config);
   ofdm_load_const;
   states.verbose = 1;
-  
-  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
-  demod_type = 0; decoder_type = 0; max_iterations = 100;
+  pass_packet_count = 0;
+ 
+  i=1;
+  while i <= length(varargin)
+    if strcmp(varargin{i},"packetsperburst")
+      states.data_mode = "burst"; % use pre/post amble based sync
+      states.packetsperburst = varargin{i+1}; i++;
+      states.postambledetectoren = 1;
+    elseif strcmp(varargin{i},"passpacketcount")
+      pass_packet_count = varargin{i+1}; i++;
+    else
+      printf("\nERROR unknown argument: [%d] %s \n", i ,varargin{i});
+      return;
+    end  
+    i++;
+  end
 
-  EsNo = 3; % TODO: fixme
-  printf("EsNo fixed at %f - need to est from channel\n", EsNo);
-  
   % some constants used for assembling modem frames
-  
+
   [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode);
 
   % load real samples from file
 
   Ascale= states.amp_scale/2.0;  % /2 as real signal has half amplitude
   frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
-  if (nargin >= 5) printf("start_secs: %d\n", start_secs); rx = rx(start_secs*Fs+1:end); end
-  if (nargin >= 6) printf("len_secs: %d\n", len_secs); rx = rx(1:len_secs*Fs); end
-  Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
+  Nsam = length(rx);
   prx = 1;
 
-  % OK generate tx frame for BER calcs
-  %   We just use a single test frame of bits as it makes interleaver sync
-  %   easier than using a test frame of bits that spans the entire interleaver
-  %   frame.  Doesn't affect operation with the speech codec.
-  
-  codec_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
-  [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, codec_bits, Ncodecframespermodemframe, Nbitspercodecframe);
+  % Generate tx frame for BER calcs
 
-  % Some handy constants, "frame" refers to modem frame less UW and
-  % txt bits.
-  
-  Ncodedbitsperframe = code_param.coded_bits_per_frame;
-  Nsymbolsperframe = code_param.coded_syms_per_frame;
-  Nuwtxtsymbolsperframe = (Nuwbits+Ntxtbits)/bps;
-  Nsymbolsperinterleavedframe = interleave_frames*Nsymbolsperframe;
+  payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
+  tx_bits = fec_encode(states, code_param, mode, payload_bits);
 
-  % buffers for interleaved frames
+  % Some handy constants
 
-  rx_np = zeros(1, Nsymbolsperinterleavedframe);
-  rx_amp = zeros(1, Nsymbolsperinterleavedframe);
-  rx_uw = [];
-  
-  tx_bits = []; tx_frames = [];
-  for f=1:interleave_frames
-    tx_bits = [tx_bits codec_bits];
-    tx_frames = [tx_frames frame_bits];
-  end
-
-  % used for rx frame sync on interleaved symbols - we demod the
-  % entire interleaved frame to raw bits
-
-  tx_symbols = [];
-  for s=1:Nsymbolsperinterleavedframe
-    tx_symbols = [tx_symbols qpsk_mod( tx_frames(2*(s-1)+1:2*s) )];
-  end
-
-  tx_symbols = gp_interleave(tx_symbols);
-
-  tx_bits_raw = [];
-  for s=1:Nsymbolsperinterleavedframe
-    tx_bits_raw = [tx_bits_raw qpsk_demod(tx_symbols(s))];
-  end
+  Nsymsperframe = Nbitsperframe/bps;
+  Nsymsperpacket = Nbitsperpacket/bps;
+  Ncodedbitsperpacket = code_param.coded_bits_per_frame;
+  Ncodedsymsperpacket = code_param.coded_syms_per_frame;
 
   % init logs and BER stats
 
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
-  phase_est_pilot_log = [];
-  sig_var_log = []; noise_var_log = [];
-  Terrs = Tbits = Terrs_coded = Tbits_coded = 0;
+  channel_est_pilot_log = []; snr_log = []; mean_amp_log = [];
+  Terrs = Tbits = Terrs_coded = Tbits_coded = Perrs_coded = 0;
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
-  Nerrs_coded = Nerrs_raw = zeros(1, interleave_frames);
+  Nerrs_coded = Nerrs_raw = 0;
   paritychecks = [0];
-  time_to_sync = -1;
-  
-  #{
-  % 'prime' rx buf to get correct coarse timing (for now)
-  
-  prx = 1;
-  nin = Nsamperframe+2*(M+Ncp);
-  states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
-  prx += nin;
-  #}
-  
+  EsNo = 1;
+  rx_uw = zeros(1,states.Nuwbits);
+
+  rx_syms = zeros(1,Nsymsperpacket); rx_amps = zeros(1,Nsymsperpacket);
+  packet_count = frame_count = 0;
+
   % main loop ----------------------------------------------------------------
 
-  for f=1:Nframes
+  rx = ofdm_rx_filter(states, mode, rx);
+  
+  f = 1;
+  while(prx < Nsam)
 
     % insert samples at end of buffer, set to zero if no samples
     % available to disable phase estimation on future pilots on last
@@ -115,166 +101,147 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
     end
     prx += states.nin;
 
-    % If looking for sync: check raw BER on frame just received
-    % against all possible positions in the interleaver frame.
-
-    % state machine(s) for modem and interleaver sync ------------------------------------
-
-    if strcmp(states.sync_state,'search') 
-      [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
+    if states.verbose
+      printf("f: %3d nin: %4d st: %-6s ", f, states.nin, states.sync_state);
     end
 
-    if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
-      [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-      [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, arx_np, arx_amp);
-           
+    if strcmp(states.sync_state,'search')
+      [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
+    else
+      % accumulate a buffer of data symbols for this packet
+      rx_syms(1:end-Nsymsperframe) = rx_syms(Nsymsperframe+1:end);
+      rx_amps(1:end-Nsymsperframe) = rx_amps(Nsymsperframe+1:end);
+      [states rx_bits achannel_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+      rx_syms(end-Nsymsperframe+1:end) = arx_np;
+      rx_amps(end-Nsymsperframe+1:end) = arx_amp;
+
+      rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end), rx_amps(end-Nuwframes*Nsymsperframe+1:end));
+
+      % We need the full packet of symbols before disassembling and checking for bit errors
+      if (states.modem_frame == (states.Np-1))
+        packet_count++;
+
+        % unpack, de-interleave PSK symbols and symbol amplitudes
+        [rx_uw_unused payload_syms payload_amps txt_bits] = disassemble_modem_packet(states, rx_syms, rx_amps);
+        payload_syms_de = gp_deinterleave(payload_syms);
+        payload_amps_de = gp_deinterleave(payload_amps);
+
+        % Count uncoded (raw) errors
+        rx_bits = zeros(1,Ncodedbitsperpacket);
+        for s=1:Ncodedsymsperpacket
+          if bps == 2 rx_bits(2*s-1:2*s) = qpsk_demod(payload_syms_de(s)); end
+          if bps == 4 rx_bits(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,payload_syms_de(s), payload_amps_de(s)); end
+        end
+        errors = xor(tx_bits, rx_bits);
+        Nerrs = sum(errors);
+        Nerrs_log = [Nerrs_log Nerrs]; Nerrs_raw = Nerrs;
+        Terrs += Nerrs;
+        Tbits += Nbitsperpacket;
+
+        % LDPC decode
+
+        % keep earlier mean amplitude estimator for compatibility with 700D
+        if states.amp_est_mode == 0
+          mean_amp = states.mean_amp;
+        else
+          mean_amp = mean(payload_amps_de)+1E-12;
+        end
+        mean_amp_log = [mean_amp_log mean_amp];
+
+        % used fixed EsNo est, as EsNo estimator for QAM not working very well at this stage
+        EsNo = 10^(states.EsNodB/10);
+
+        % TODO 2020 support for padding with known data bits
+
+        [rx_bits paritychecks] = fec_decode(states, code_param, payload_syms_de,...
+                                            payload_amps_de, mean_amp, EsNo);
+        errors = xor(payload_bits, rx_bits);
+        Nerrs_coded  = sum(errors);
+
+        if Nerrs_coded Perrs_coded++; end
+        Terrs_coded += Nerrs_coded;
+        Tbits_coded += code_param.data_bits_per_frame;
+        Nerrs_coded_log = [Nerrs_coded_log Nerrs_coded];
+        
+        % per-packet SNR estimate
+        EsNo_estdB = esno_est_calc(rx_syms);
+        SNR_estdB = snr_from_esno(states, EsNo_estdB);
+        snr_log = [snr_log SNR_estdB];
+      end
+
       % we are in sync so log modem states
 
       rx_np_log = [rx_np_log arx_np];
       timing_est_log = [timing_est_log states.timing_est];
       delta_t_log = [delta_t_log states.delta_t];
       foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
-      phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
-      sig_var_log = [sig_var_log states.sig_var];
-      noise_var_log = [noise_var_log states.noise_var];
-      
-      % update sliding windows of rx-ed symbols and symbol amplitudes,
-      % discarding UW and txt symbols at start of each modem frame
-
-      rx_np(1:Nsymbolsperinterleavedframe-Nsymbolsperframe) = rx_np(Nsymbolsperframe+1:Nsymbolsperinterleavedframe);
-      rx_np(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = payload_syms;
-      rx_amp(1:Nsymbolsperinterleavedframe-Nsymbolsperframe) = rx_amp(Nsymbolsperframe+1:Nsymbolsperinterleavedframe);
-      rx_amp(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = payload_amps;
-           
-      mean_amp = states.mean_amp;
-      
-      % de-interleave QPSK symbols and symbol amplitudes
-
-      rx_np_de = gp_deinterleave(rx_np);
-      rx_amp_de = gp_deinterleave(rx_amp);
-      
-      % Interleaver Sync:
-      %   Needs to work on any data
-      %   Use indication of LDPC convergence, may need to patch CML code for that
-      %   Attempt a decode on every frame, when it converges we have sync
-
-      next_sync_state_interleaver = states.sync_state_interleaver;
-
-      if strcmp(states.sync_state_interleaver,'search')
-        Nerrs = 0;
-        if strcmp(mode, "700D")
-          % using LDPC decoder to obtain interleaver sync only supported for 700D so far
-          st = 1; en = Ncodedbitsperframe/bps;
-          [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
-          Nerrs = code_param.data_bits_per_frame - max(paritychecks);
-          %printf("Nerrs: %d\n", Nerrs);
-        end
-        
-        % note we just go straight into sync if interleave_frames == 1
-        
-        if (Nerrs < 10) || (interleave_frames == 1)
-          % sucessful(ish) decode!
-          next_sync_state_interleaver = 'synced';
-          states.frame_count_interleaver = interleave_frames;
-        end
-      end
-
-      states.sync_state_interleaver = next_sync_state_interleaver;
-            
-      if strcmp(states.sync_state_interleaver,'synced') && (states.frame_count_interleaver == interleave_frames)
-        states.frame_count_interleaver = 0;
-        Nerrs_raw = Nerrs_coded = zeros(1, interleave_frames);
-
-        %printf("decode!\n");
-        
-        % measure uncoded bit errors over interleaver frame
-
-        rx_bits_raw = [];
-        for s=1:Nsymbolsperinterleavedframe
-          rx_bits_raw = [rx_bits_raw qpsk_demod(rx_np_de(s))];
-        end
-        for ff=1:interleave_frames
-          st = (ff-1)*Ncodedbitsperframe+1; en = st+Ncodedbitsperframe-1;
-          errors = xor(frame_bits, rx_bits_raw(st:en));
-          Nerrs = sum(errors);
-          Nerrs_log = [Nerrs_log Nerrs];
-          Nerrs_raw(ff) += Nerrs;
-          Tbits += Ncodedbitsperframe;
-          Terrs += Nerrs;
-        end
-        
-        % LDPC decode
-        %  note: ldpc_errors can be used to measure raw BER
-        %        std CML library doesn't have an indication of convergence
-
-        rx_bits = [];
-        for ff=1:interleave_frames
-
-          if strcmp(mode, "700D")
-            st = (ff-1)*Nsymbolsperframe+1; en = st + Nsymbolsperframe-1;
-            [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
-            arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
-            errors = xor(codec_bits, arx_bits);
-            Nerrs  = sum(errors);
-            Tbits_coded += code_param.data_bits_per_frame;
-            rx_bits = [rx_bits arx_bits];
-          end
-          
-          Nerrs_coded(ff) = Nerrs;
-          Terrs_coded += Nerrs;
-          Nerrs_coded_log = [Nerrs_coded_log Nerrs];
-        end
-      end
+      channel_est_pilot_log = [channel_est_pilot_log; achannel_est_pilot_log];
+      frame_count++;
     end
-    
+
     states = sync_state_machine(states, rx_uw);
 
     if states.verbose
-      r = mod(states.frame_count_interleaver,  interleave_frames)+1;
-      pcc = max(paritychecks);
-      iter = 0;
-      for i=1:length(paritychecks)
-        if paritychecks(i) iter=i; end
-      end
-      printf("f: %3d st: %-6s euw: %2d %1d ist: %-6s eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f nin: %d\n",
-             f, states.last_sync_state, states.uw_errors, states.sync_counter, states.last_sync_state_interleaver,
-             Nerrs_raw(r), Nerrs_coded(r), iter, pcc, states.foff_est_hz, states.nin);
-      % detect a sucessful sync
-      if (time_to_sync < 0) && (strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial'))
-        if (pcc > 80) && (iter != 100)
-          time_to_sync = f*Nsamperframe/Fs;
+      if strcmp(states.last_sync_state,'search') == 0
+        pcc = max(paritychecks);
+        iter = 0;
+        for i=1:length(paritychecks)
+          if paritychecks(i) iter=i; end
+        end
+        % complete logging line
+        if (states.modem_frame == 0) && (strcmp(states.last_sync_state, "trial") == 0)
+            printf("euw: %3d %d mf: %2d pbw: %s foff: %4.1f eraw: %3d ecod: %3d iter: %3d pcc: %3d snr: %5.2f",
+                    states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1), states.foff_est_hz,
+                    Nerrs_raw, Nerrs_coded, iter, pcc, SNR_estdB);
+        else
+            printf("euw: %3d %d mf: %2d pbw: %s foff: %4.1f",
+                    states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1), states.foff_est_hz);        
         end
       end
+      printf("\n");
     end
 
-    % act on any events returned by modem sync state machine
-    
-    if states.sync_start
-      Nerrs_raw = Nerrs_coded = zeros(1, interleave_frames);
+    % reset stats if in streaming mode, don't reset if in burst mode
+    if strcmp(states.data_mode, "streaming") && states.sync_start
+      Nerrs_raw = Nerrs_coded = 0;
       Nerrs_log = [];
       Terrs = Tbits = 0;
       Tpacketerrs = Tpackets = 0;
       Terrs_coded = Tbits_coded = 0;
       error_positions = Nerrs_coded_log = [];
     end
+    f++;
   end
+  Nframes = f;
   
-  printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
+  printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d SNR3k: %5.2f\n", Terrs/(Tbits+1E-12), Tbits, Terrs, mean(snr_log));
   printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", Terrs_coded/(Tbits_coded+1E-12), Tbits_coded, Terrs_coded);
+  printf("Coded PER: %5.4f Pckts: %5d Perrs: %5d Npre: %d Npost: %d\n", 
+         Perrs_coded/(packet_count+1E-12), packet_count, Perrs_coded,  states.npre, states.npost);
 
   if length(rx_np_log)
-      figure(1); clf; 
-      plot(rx_np_log,'+');
-      mx = max(abs(rx_np_log));
+      figure(1); clf;
+      plot(exp(j*pi/4)*rx_np_log(floor(end/4):floor(end-end/8)),'+');
+      mx = 2*mean(abs(channel_est_pilot_log(:)));
       axis([-mx mx -mx mx]);
       title('Scatter');
 
       figure(2); clf;
-      plot(phase_est_pilot_log,'g+', 'markersize', 5); 
+      plot(angle(channel_est_pilot_log),'g+', 'markersize', 5);
       title('Phase est');
-      axis([1 length(phase_est_pilot_log) -pi pi]);
+      axis([1 length(channel_est_pilot_log) -pi pi]);
 
       figure(3); clf;
+      amp_est = abs(channel_est_pilot_log);
+      plot(amp_est,'g+', 'markersize', 5);
+      title('Amp est');
+      axis([1 length(channel_est_pilot_log) min(amp_est(:)) max(amp_est(:))]);
+
+      figure(4); clf;
+      subplot(211); plot(snr_log); ylabel('SNR3kdB');
+      subplot(212); plot(mean_amp_log); ylabel('mean amp');
+
+      figure(5); clf;
       subplot(211)
       stem(delta_t_log)
       title('delta t');
@@ -282,43 +249,31 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
       plot(timing_est_log);
       title('timing est');
 
-      figure(4); clf;
+      figure(6); clf;
       plot(foff_est_hz_log)
-      mx = max(abs(foff_est_hz_log));
+      mx = max(max(abs(foff_est_hz_log)),1);
       axis([1 max(Nframes,2) -mx mx]);
       title('Fine Freq');
       ylabel('Hz')
   end
-   
+
   if length(Nerrs_log) > 1
-    figure(5); clf;
+    figure(7); clf;
     subplot(211)
     stem(Nerrs_log);
-    title('Uncoded errrors/modem frame')
-    axis([1 length(Nerrs_log) 0 Nbitsperframe*rate/2]);
+    title('Uncoded errors/modem frame')
+    axis([1 length(Nerrs_log) 0 Nbitsperpacket*0.2]);
     if length(Nerrs_coded_log)
       subplot(212)
       stem(Nerrs_coded_log);
       title('Coded errors/mode frame')
-      axis([1 length(Nerrs_coded_log) 0 Nbitsperframe/2]);
+      axis([1 length(Nerrs_coded_log) 0 Nbitsperpacket*0.2]);
     end
   end
-  
-  figure(6); clf;
-  snr_estdB = 10*log10(sig_var_log) - 10*log10(noise_var_log) + 10*log10(Nc*Rs/3000);
-  snr_smoothed_estdB = filter(0.1,[1 -0.9],snr_estdB);
-  plot(snr_smoothed_estdB);
-  title('Signal and Noise Power estimates');
-  ylabel('SNR (dB)')
 
-  figure(7); clf; plot_specgram(rx);
-  if len_secs
-    axis([0 len_secs 500 2500])
-  end
-  
-  if (nargin == 4) && strlen(error_pattern_filename)
-    fep = fopen(error_pattern_filename, "wb");
-    fwrite(fep, error_positions, "uchar");
-    fclose(fep);
+  figure(9); clf; plot_specgram(rx, Fs=8000, 0, 3000);
+
+  if pass_packet_count > 0
+    if packet_count >= pass_packet_count printf("Pass!\n"); else printf("Fail!\n"); end;
   end
 endfunction

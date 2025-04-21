@@ -1,213 +1,161 @@
 # Codec 2 README
 
-Codec 2 is an open source (LGPL 2.1) low bit rate speech codec:
-
-http://rowetel.com/codec2.html
+Codec 2 is an open source (LGPL 2.1) low bit rate speech codec: http://rowetel.com/codec2.html
 
 Also included:
 
-  + FreeDV API source code.  FreeDV is an open source digital voice
-    protocol that integrates the modems, codecs, and FEC
-  + FDMDV DPSK modem (README_fdmdv) for HF channels
-  + Coherent PSK ((README_cohpsk) for HF channels
-  + Non-coherent FSK modem (README_fsk)
-  + Coherent OFDM modem for HF channels (README_ofdm)
-  + software for High Altitude Balloon image and telemetry reception
+  + The FreeDV API for digital voice over radio. FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC [README_freedv](README_freedv.md)
+  + HF OFDM and FSK modems, FEC used in the FreeDV API
+  + APIs for packet data over radio [README_data](README_data.md)
+  + An STM32 embedded version of FreeDV 1600/700D/700E for the [SM1000](stm32/README.md)
+
+## Older code
+
+In July 2023 this repo was refactored, older code can be found in https://github.com/drowe67/codec2-dev
 
 ## Quickstart
 
-Also see [INSTALL](INSTALL) for more general building and installing instructions. 
+1. Install packages (Debian/Ubuntu):
+   ```
+   sudo apt install git build-essential cmake
+   ```
+   Fedora/RH distros:
+   ```
+   sudo dnf groupinstall "Development Tools" "C Development Tools and Libraries"
+   sudo dnf install cmake
+   ```
+   
+1. Build Codec 2:
+   ```
+   git clone https://github.com/drowe67/codec2.git
+   cd codec2
+   mkdir build_linux
+   cd build_linux
+   cmake ..
+   make
+   ```
 
-1/ Build Codec 2:
-```
-$ cd codec2
-$ mkdir build_linux
-$ cd build_linux
-$ cmake ..
-$ make
-```
+1. Listen to Codec 2:
+   ```
+   cd codec2/build_linux
+   ./demo/c2demo ../raw/hts1a.raw hts1a_c2.raw
+   aplay -f S16_LE ../raw/hts1a.raw
+   aplay -f S16_LE hts1a_c2.raw
+   ```
+1. Compress, decompress and then play a file using Codec 2 at 2400 bit/s:
+   ```
+   ./src/c2enc 2400 ../raw/hts1a.raw hts1a_c2.bit
+   ./src/c2dec 2400 hts1a_c2.bit hts1a_c2_2400.raw 
+   ```
+   which can be played with:
+   ```
+   aplay -f S16_LE hts1a_c2_2400.raw
+   ```
+   Or using Codec 2 using 700C (700 bits/s):
+   ```
+   ./src/c2enc 700C ../raw/hts1a.raw hts1a_c2.bit
+   ./src/c2dec 700C hts1a_c2.bit hts1a_c2_700.raw
+   aplay -f S16_LE hts1a_c2_700.raw
+   ```
+1. If you prefer a one-liner without saving to files:
+   ```
+   ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | aplay -f S16_LE
+   ```
 
-2/ Listen to Codec 2:
-```
-$ ./src/c2demo ../raw/hts1a.raw hts1a_c2.raw
-$ play -t raw -r 8000 -e signed-integer -b 16 ../raw/hts1a.raw
-$ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2.raw
-```
-3/ Compress, decompress and then play a file:
-
-   using 2400 bps bit rate encoding
-```
-$ ./src/c2enc 2400 ../raw/hts1a.raw hts1a_c2.bit
-$ ./src/c2dec 2400 hts1a_c2.bit hts1a_c2_2400.raw 
-```
-   which can be played with
-```
-$ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_2400.raw
-```
-   using 700C bps bit rate encoding
-```
-$ ./src/c2enc 700C ../raw/hts1a.raw hts1a_c2.bit
-$ ./src/c2dec 700C hts1a_c2.bit hts1a_c2_700.raw
-```
-   which can be played with
-```
-$ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_700.raw
-```
-4/ If you prefer a one-liner without saving to files:
-```
-$ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -b 16 -e signed-integer -
-```
-   Same at 450 bit/s:
-```
-$ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450 - - | play -t raw -r 8000 -e signed-integer -b 16 -
-```
-   Please note that 450PWB (pseudo-wideband) can be chosen for decoding, providing a bandwidth extension to 8kHz/16ksps from a 4kHz/8ksps encoded 450bit/s file:
-```
-$ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450PWB - - | play -t raw -r 16000 -e signed-integer -b 16 -
-```
-## Programs
-
-+ c2demo encodes a file of speech samples, then decodes them and
-  saves the result.
-
-+ c2enc encodes a file of speech samples to a compressed file of
-  encoded bits.  c2dec decodes a compressed file of bits to a file of
-  speech samples.
-
-+ c2sim is a simulation/development version of Codec 2.  It allows
-  selective use of the various Codec 2 algorithms.  For example
-  switching phase modelling or LSP quantisation on and off.
-
-+ freedv_tx/freedv_rx are command line implementations of the FreeDV
-  protocol, which combines Codec 2, modems, and Forward Error
-  Correction (FEC).
-  
-+ cohpsk_* are coherent PSK (COHPSK) HF modem command line programs.
-
-+ drs232, drs232_ldpc, and horus_demod are used for receiving images
-  and telemetry from high altitude balloons (Project Horus Wenet,
-  Horus Binary protocol)
-
-+ fdmdv_* are differential PSK HF modem command line programs (README_fdmdv).
-
-+ fsk_* are command line programs for a non-coherent FSK modem (README_fsk).
-
-+ ldpc_* are LDPC encoder/decoder command line programs, based on the CML library.
-
-+ ofdm_* are OFDM PSK HF modem command line programs (README_ofdm).
-
+1. Or you can use your microphone and headphones to encode and listen to the result on the fly:
+   ```
+   br=1300; arecord -f S16_LE -c 1 -r 8000 | ./src/c2enc $br - - | ./src/c2dec $br - - | aplay -f S16_LE -
+   ```
+   
 ## FreeDV 2020 support (building with LPCNet)
-
-NOTE: Instructions assume you are creating a build_linux directory from within
-      the source directory. Adjust paths as needed if this is not the case.
-
-1. Build codec2 initially without LPCNet
-   ```
-   $ cd ~
-   $ git clone https://github.com/drowe67/codec2.git
-   $ cd codec2 && mkdir build_linux && cd build_linux
-   $ cmake ../
-   $ make
-   ```
 
 1. Build LPCNet:
    ```
-   $ cd ~
-   $ git clone https://github.com/drowe67/LPCNet
-   $ cd LPCNet && mkdir build_linux && cd build_linux
-   $ cmake -DCODEC2_BUILD_DIR=~/codec2/build_linux ../ 
-   $ make
+   cd ~
+   git clone https://github.com/drowe67/LPCNet
+   cd LPCNet && mkdir build_linux && cd build_linux
+   cmake .. 
+   make
    ```
 
-1. (Re)build Codec 2 with LPCNet support:
+1. Build Codec 2 with LPCNet support:
    ```
-   $ cd ~/codec2/build_linux && rm -Rf *
-   $ cmake -DLPCNET_BUILD_DIR=~/LPCNet/build_linux ..
-   $ make
+   cd ~/codec2/build_linux && rm -Rf *
+   cmake -DLPCNET_BUILD_DIR=~/LPCNet/build_linux ..
+   make
    ```
 
-### FreeDV 2020 tests with FreeDV API
+## Programs
 
-Reference: Plugging together lpcnet_enc -> ofdm_mod -> ofdm_demod -> lpcnet_dec:
-```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --ts 0.0205 --nc 31 --ldpc 2 --verbose 1 -p 312 | ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
-```
-We are trying to integrate all of the above into FreeDV API.
++ See `demo` directory for simple examples of using Codec and the FreeDV API.
 
-Listen the reference tx:
-```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --ts 0.0205 --nc 31 --ldpc 2 --verbose 1 -p 312 | aplay -f S16_LE
-```
++ `c2demo` encodes a file of speech samples, then decodes them and saves the result.
 
-Listen the freedv_tx:
-```
-$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | aplay -f S16_LE
-```
++ `c2enc` encodes a file of speech samples to a compressed file of encoded bits.  `c2dec` decodes a compressed file of bits to a file of speech samples.
 
-FreeDV API tx, with reference rx from above:
-```
-$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
-```
++ `c2sim` is a simulation/development version of Codec 2.  It allows selective use of the various Codec 2 algorithms.  For example switching phase modelling or quantisation on and off.
 
-FreeDV API tx and rx:
-```
-$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
-$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - --testframes | ./freedv_rx 2020 - /dev/null --testframes -vv
-```
++ `freedv_tx` & `freedv_rx` are command line implementations of the FreeDV protocol, which combines Codec 2, modems, and Forward Error Correction (FEC).
+  
++ `cohpsk_*` are coherent PSK (COHPSK) HF modem command line programs.
 
-Simulated HF slow fading channel, 10.8dB SNR:
-```
-$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -30 --Fs 8000 --slow | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
-```
-It falls down quite a bit with fast fading (--fast).  We'll work on that.
++ `fdmdv_*` are differential PSK HF modem command line programs (README_fdmdv).
 
-AWGN (noise but no fading) channel, 2.8dB SNR:
-```
-$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -22 --Fs 8000 | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
-```
++ `fsk_*` are command line programs for a non-coherent FSK modem (README_fsk).
+
++ `ldpc_*` are LDPC encoder/decoder command line programs, based on the CML library.
+
++ `ofdm_*` are OFDM PSK HF modem command line programs (README_ofdm).
 
 ## Building and Running Unit Tests
 
-CTest is used as a test frame work, with support from GNU Octave
-scripts.
+CTest is used as a test framework, with support from [GNU Octave](https://www.gnu.org/software/octave/) scripts.
 
-1/ Install GNU Octave on Ubuntu with:
-```
-$ sudo apt install octave octave-control octave-parallel octave-signal octave-specfun
-```
-  (see also Octave section below)
-  
-2/ To build and run the tests:
-```
-$ cd ~/codec2
-$ rm -Rf build_linux && mkdir build_linux
-$ cd build_linux
-$ cmake -DCMAKE_BUILD_TYPE=Debug ..
-$ make all test
-```
-3/ To just run tests without rebuilding:
-```
-$ make test
-```
-4/ To get a verbose run (e.g. for test debugging):
-```
-$ ctest -V
-```
-5/ To just run a single test:
-```
-$ ctest -R test_OFDM_modem_octave_port
-```
-5/ To list the available tests:
-```
-$ ctest -N
-```
+1. Install GNU Octave and libraries on Ubuntu with:
+   ```
+   sudo apt install octave octave-common octave-signal liboctave-dev gnuplot python3-numpy sox valgrind clang-format
+   ```
+1. To build and run the tests:
+   ```
+   cd ~/codec2
+   rm -Rf build_linux && mkdir build_linux
+   cd build_linux
+   cmake -DUNITTEST=1 ..
+   make
+   ```
+
+1. To just run tests without rebuilding:
+   ```
+   ctest
+   ```
+
+1. To get a verbose run (e.g. for test debugging):
+   ```
+   ctest -V
+   ```
+
+1. To just run a single test:
+   ```
+   ctest -R test_OFDM_modem_octave_port
+   ```
+
+1. To list the available tests:
+   ```
+   ctest -N
+   ```
+
+1. Many Octave scripts rely on the CML LDPC library.  To run these from the Octave CLI, you need to set
+   the `CML_PATH` environment variable.  A convenient way to do this is using a `.octaverc` file
+   in your `codec/octave` directory.  For example on a Linux machine, create a `.octaverc` file:
+   ```
+   setenv("CML_PATH","../build_linux/cml")
+   ```  
+   
 ## Directories
 ```
 cmake       - cmake support files
-misc        - misc C programs that have been useful in development,
-              not reqd for Codec 2 release. Part of Debug build.
-octave      - Octave scripts used to support development
-script      - shell scripts for playing and converting raw files
+demo        - Simple Codec 2 and FreeDv API demo applications
+octave      - Octave scripts used to support ctests
 src         - C source code for Codec 2, FDMDV modem, COHPSK modem, FreeDV API
 raw         - speech files in raw format (16 bits signed linear 8 kHz)
 stm32       - STM32F4 microcontroller and SM1000 FreeDV Adaptor support
@@ -216,93 +164,98 @@ wav         - speech files in wave file format
 ```
 ## GDB and Dump Files
 
-1/ To compile with debug symbols for using gdb:
-```
-$ cd ~/codec2
-$ rm -Rf build_linux && mkdir build_linux
-$ cd build_linux
-$ CFLAGS=-g cmake ..
-$ make
-```
-2/ For dump file support (dump data from c2sim for input to Octave
-development scripts):
-```
-$ cd ~/codec2
-$ rm -Rf build_linux && mkdir build_linux
-$ cd build_linux
-$ CFLAGS=-DDUMP cmake ..
-$ make
-```
+1. To compile with debug symbols for using gdb:
+   ```
+   cd ~/codec2
+   rm -Rf build_linux && mkdir build_linux
+   cd build_linux
+   CFLAGS=-g cmake ..
+   make
+   ```
+
 ## Building for Windows on a Linux machine
 
-On Ubuntu 17:
-```
-$ sudo apt-get install mingw-w64
-$ mkdir build_windows && cd build_windows
-$ cmake .. -DCMAKE_TOOLCHAIN_FILE=/home/david/freedv-dev/cmake/Toolchain-Ubuntu-mingw32.cmake -DUNITTEST=FALSE -DGENERATE_CODEBOOK=/home/david/codec2/build_linux/src/generate_codebook 
-$ make
-```
-## Building for Windows on a Windows machine
+We recommend using Linux to cross compile for Windows.
 
- mkdir build_windows (Or what ever you want to call your build dir)
- cmake -G "MinGW Makefiles" -D CMAKE_MAKE_PROGRAM=mingw32-make.exe
- Or if you use ninja for building cmake -G "Ninja" ..
- mingw32-make or ninja  depends on what you used in the last command
- wait for it to build.
+On Ubuntu Linux:
+   ```
+   sudo apt-get install mingw-w64
+   mkdir build_windows && cd build_windows
+   cmake .. -DCMAKE_TOOLCHAIN_FILE=/home/david/freedv-dev/cmake/Toolchain-Ubuntu-mingw32.cmake -DUNITTEST=FALSE -DGENERATE_CODEBOOK=/home/david/codec2/build_linux/src/generate_codebook 
+   make
+   ```
+   
+This will create a working `libcodec2.dll` file for use with other applications (e.g. FreeDV GUI which is in wide spread use on Windows).  Please note the utility/development command line applications (e.g. `freedv_rx.exe`) may not work exactly the same on the Windows CLI compared to running on a Unix machine/shell.  For example pipes may not function as expected, and ctests are not supported.  Our primary development and test environment is Unix, and we lack the resources to support and maintain these applications for other operating systems.
 
-## Octave Packages
+## Including Codec 2 in an Android project
 
-To run the Octave scripts the following libraries are required:
+In an Android Studio 'NDK' project (a project that uses 'native' code)
+Codec 2 can be added to the project in the following way.
 
-Package Name  | Version | Installation directory
---------------|---------|-----------------------
-control *     |   2.6.2 | /usr/share/octave/packages/control-2.6.2
-general *     |   1.3.4 | /usr/share/octave/packages/general-1.3.4
-parallel *    |   2.2.0 | /usr/share/octave/packages/parallel-2.2.0
-plot *        |   1.1.0 | /usr/share/octave/packages/plot-1.1.0
-signal *      |   1.2.2 | /usr/share/octave/packages/signal-1.2.2
-specfun *     |   1.1.0 | /usr/share/octave/packages/specfun-1.1.0
+1. Add the Codec 2 source tree to your app (e.g. in app/src/main/codec2)
+   (e.g. as a git sub-module).
 
-These can be installed using your systems package management system or
-the Octave package management system.  The version number of each
-package is not important.
+1. Add Codec 2 to the CMakeList.txt (app/src/main/cpp/CMakeLists.txt):
 
-On Ubuntu install with:
+    ```
+    # Sets lib_src_DIR to the path of the target CMake project.
+    set( codec2_src_DIR ../codec2/ )
+    # Sets lib_build_DIR to the path of the desired output directory.
+    set( codec2_build_DIR ../codec2/ )
+    file(MAKE_DIRECTORY ${codec2_build_DIR})
+
+    add_subdirectory( ${codec2_src_DIR} ${codec2_build_DIR} )
+
+    include_directories(
+	    ${codec2_src_DIR}/src
+	    ${CMAKE_CURRENT_BINARY_DIR}/../codec2
+    )
+    ```
+     
+1. Add Codec 2 to the target_link_libraries in the same file.
+
+## Building Codec 2 for Microcontrollers
+
+Codec 2 requires a hardware Floating Point Unit (FPU) to run in real time.
+
+Two build options have been added to support building on microcontrollers:
+1. Setting the `cmake` variable MICROCONTROLLER_BUILD disables position independent code (-fPIC is not used).  This was required for the IMRT1052 used in Teensy 4/4.1).
+
+1. On ARM machines, setting the C Flag \_\_EMBEDDED\_\_ and linking with the ARM CMSIS library will improve performance on ARM-based microcontrollers. \_\_REAL\_\_ and FDV\_ARM\_MATH are additional ARM-specific options that can be set to improve performance if required, especially with OFDM modes.
+
+A CMakeLists.txt example for a microcontroller is below:
+
 ```
-$ sudo apt install octave octave-control octave-parallel octave-signal octave-specfun
-```
-## FreeDV API
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+set(MICROCONTROLLER_BUILD 1)
 
-See freedv_api.h and freedv_api.c, and the demo programs freedv_tx &
-freedv_rx.  Quickstart demo using FreeDV 1600:
-```
-$ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
-$ cat freedv_rx_log.txt
-```
-## FreeDV 2400A and 2400B modes
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mlittle-endian -ffunction-sections -fdata-sections -g -O3")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -ffunction-sections -fdata-sections")
 
-FreeDV 2400A and FreeDV 2400B are modes designed for VHF radio.
-FreeDV 2400A is designed for SDR radios (it has a 5 kHz RF bandwidth),
-however FreeDV 2400B is designed to pass through commodity FM radios.
+add_definitions(-DCORTEX_M7 -D__EMBEDDED__)
+add_definitions(-DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1 -DFREEDV_MODE_700D_EN=1 -DFREEDV_MODE_700E_EN=1 -DCODEC2_MODE_EN_DEFAULT=0 -DCODEC2_MODE_1300_EN=1 -DCODEC2_MODE_700C_EN=1)
+                    
+FetchContent_Declare(codec2
+    GIT_REPOSITORY https://github.com/drowe67/codec2.git
+    GIT_TAG origin/master
+    GIT_SHALLOW ON
+    GIT_PROGRESS ON
+)
+FetchContent_GetProperties(codec2)
+if(NOT ${codec2_POPULATED})
+    FetchContent_Populate(codec2)
+endif()
+set(CMAKE_REQUIRED_FLAGS "")
 
-Demos of FreeDV 2400A and 2400B:
-```
-$ ./freedv_tx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - - | play -t raw -r 8000 -s -2 -
-$ ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400B - - | play -t raw -r 8000 -s -2 -
-```
-Note for FreeDV 2400A/2400B the modem signal sample rate is 48kHz.  To
-listen to the modem tones from FreeDV 2400B, or play them into a FM HT
-mic input:
-```
-$ ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | play -t raw -r 48000 -s -2 -
-```
-Simulate FreeDV 2400B passing through a 300 to 3000 Hz audio path using sox to filter:
-```
-$  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t raw -r 48000 -s -2 - -t raw - sinc 300-3000 | ./freedv_rx 2400B - - | play -t raw -r 8000 -s -2 -
+set(LPCNET OFF CACHE BOOL "")
+add_subdirectory(${codec2_SOURCE_DIR} ${codec2_BINARY_DIR} EXCLUDE_FROM_ALL)
 ```
 
-## Links:
+## Building Debian packages
 
-+ FreeDV 2400A blog post ...: http://www.rowetel.com/?p=5119
-+ FreeDV 2400A & 2400B demos: http://www.rowetel.com/?p=5219
+To build Debian packages, simply run the "cpack" command after running "make". This will generate the following packages:
 
++ codec2: Contains the .so and .a files for linking/executing applications dependent on Codec2.
+* codec2-dev: Contains the header files for development using Codec2.
+
+Once generated, they can be installed with "dpkg -i" (once LPCNet is installed). If LPCNet is not desired, CMakeLists.txt can be modified to remove that dependency.
