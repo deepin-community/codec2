@@ -1,3 +1,9 @@
+codec2 (0.9.2-4deepin1) unstable; urgency=medium
+
+  * Rebuild with LTO enabled (dpkg vendor feature optimize/lto).
+
+ -- tunaichao <tunaichao@uniontech.com>  Mon, 21 Sep 2026 14:46:52 +0800
+
 codec2 (0.9.2-4) unstable; urgency=medium
 
   * update homepage (Closes: #976065)
